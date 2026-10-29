@@ -2,21 +2,36 @@
 
 A web console for support agents working with the Yotpo APIs: generate an access token (U-Token), then create, update and retrieve products, orders and reviews, and preview a store's on-site widgets.
 
-There are two ways to run it:
+**Team link: https://allntngl.github.io/Yotpo-Tool-Allen/**
 
-- **Hosted (recommended for teams):** the page runs on GitHub Pages and API calls go through a small Cloudflare Worker. Agents just open the link. Nothing to install.
+Ways to run it:
+
+- **Website + Connector extension (recommended for teams):** open the link and install the small Yotpo Tool Connector Chrome extension once. Nothing else to set up.
+- **Website + Cloudflare Worker (optional):** no extension needed for agents, but someone has to deploy a Worker once. See "Cloudflare Worker setup" below.
 - **Local:** run `npm start` and open http://localhost:3000. Needs Node.js 18+.
 
 ## Why a proxy is needed (CORS)
 
-Browsers block web pages from calling `api.yotpo.com` directly, which shows up as a CORS error. So the page never calls Yotpo itself. It sends each request to a proxy, and the proxy makes the call server-side, where CORS doesn't apply.
+Browsers block web pages from calling `api.yotpo.com` directly, which shows up as a CORS error. So the page never calls Yotpo itself. Something outside the page makes the call, where CORS doesn't apply:
 
-- Locally, the proxy is `server.js`.
-- Hosted, the proxy is the Cloudflare Worker in `worker/worker.js`.
+- On the website: the Connector extension (`extension/`), or a Cloudflare Worker (`worker/worker.js`) if `config.js` sets one.
+- Locally: `server.js`.
 
-Both proxies only forward to `https://api.yotpo.com` and `https://api-cdn.yotpo.com`, and store nothing. The Worker only accepts requests from the sites listed in its `ALLOWED_ORIGINS` setting.
+All of them only forward to `https://api.yotpo.com` and `https://api-cdn.yotpo.com`, and store nothing.
 
-## Hosted setup (one time, about 10 minutes)
+## Installing the Connector extension (each agent, once)
+
+1. Open the team link. Until the extension is installed, the page shows a setup banner with a download link.
+2. Download `yotpo-tool-connector.zip` from the banner and unzip it.
+3. In Chrome, open `chrome://extensions` and turn on **Developer mode** (top right).
+4. Click **Load unpacked** and select the unzipped folder (the one containing `manifest.json`).
+5. Reload the tool page. The banner disappears and every tab works.
+
+The extension only runs on `https://allntngl.github.io/Yotpo-Tool-Allen/` and only has access to the two Yotpo API hosts. It doesn't read other sites. If your company's Chrome policy blocks Developer mode, ask IT to allow the extension, or use the Cloudflare Worker option instead.
+
+When the extension changes, agents download the new zip, then click the reload icon on the extension's card in `chrome://extensions`.
+
+## Cloudflare Worker setup (optional, one time)
 
 ### 1. Deploy the Cloudflare Worker
 
@@ -41,7 +56,7 @@ window.YOTPO_TOOL_CONFIG = {
 
 Commit and push.
 
-### 3. Turn on GitHub Pages
+## Publishing the site (GitHub Pages)
 
 In the GitHub repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
