@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget Frame</title>
+  <style>
+    html, body { margin: 0; background: #ffffff; color: #1b1f24; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #mount { padding: 16px; min-height: 40px; }
+  </style>
+</head>
+<body>
+  <div id="mount"></div>
+  <script>
+    // Loads the Yotpo widget loader for one app key in isolation, reports the
+    // store's widget list to the parent page, and renders one widget on request.
+    const params = new URLSearchParams(location.search);
+    const appKey = params.get("appKey") || "";
+    const instanceId = params.get("instanceId") || "";
+    const productId = params.get("productId") || "";
+    const mount = document.getElementById("mount");
+
+    const post = (msg) => parent.postMessage({ source: "yotpo-widget-frame", ...msg }, location.origin);
+
+    // Keep the parent iframe sized to the rendered widget.
+    new ResizeObserver(() => post({ type: "height", height: document.documentElement.scrollHeight }))
+      .observe(document.body);
+
+    function versionOf(w) {
+      const m = w.templateAssetUrl && w.templateAssetUrl.match(/app\.v0\.([^-]+-\d+)\.js/);
+      return m ? m[1] : "";
+    }
+
+    if (!appKey) {
+      post({ type: "error", message: "No app key provided." });
+    } else {
+      const s = document.createElement("script");
+      s.src = "https://cdn-widgetsrepository.yotpo.com/v1/loader/" + encodeURIComponent(appKey);
+      s.onload = () => {
+        const container = window.yotpoWidgetsContainer;
+        const widgets = container && container.guids && container.guids[appKey] && container.guids[appKey].config && container.guids[appKey].config.widgets;
+        if (!widgets) {
+          post({ type: "error", message: "No widgets found for this app key, or the app key is invalid." });
+          return;
+        }
+        const list = Object.values(widgets).map((w) => ({
+          instanceId: String(w.instanceId),
+          className: w.className || "",
+          version: versionOf(w),
+          cssOverrideAssetUrl: w.cssOverrideAssetUrl || "",
+        }));
+        post({ type: "widgets", appKey, widgets: list });
+
+        if (instanceId) renderWhenReady(Date.now());
+      };
+      s.onerror = () => post({ type: "error", message: "Couldn't load the Yotpo widget loader. Check the app key or your network." });
+      document.head.appendChild(s);
+    }
+
+    // The loader fetches Yotpo's initializer asynchronously, and initWidget only
+    // exists once it has loaded, so wait for it before placing the widget.
+    function renderWhenReady(started) {
+      const container = window.yotpoWidgetsContainer;
+      if (!container || !container.initWidget) {
+        if (Date.now() - started > 20000) {
+          post({ type: "error", message: "Yotpo's widget initializer didn't load in time." });
+        } else {
+          setTimeout(() => renderWhenReady(started), 100);
+        }
+        return;
+      }
+      const div = document.createElement("div");
+      div.className = "yotpo-widget-instance";
+      div.dataset.yotpoInstanceId = instanceId;
+      if (productId) div.dataset.yotpoProductId = productId;
+      else div.setAttribute("mode-preview", "true");
+      mount.appendChild(div);
+      try {
+        container.initWidget(instanceId, div);
+        post({ type: "rendered", instanceId });
+      } catch (err) {
+        post({ type: "error", message: "Widget failed to initialize: " + err.message });
+      }
+    }
+  </script>
+</body>
+</html>

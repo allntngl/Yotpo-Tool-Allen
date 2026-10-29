@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yotpo Support Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try { const t = localStorage.getItem("yt_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l8 7 8-7"/><path d="M12 13v7"/></svg>
+      </span>
+      <div>
+        <div class="brand-name">Yotpo Console</div>
+        <div class="brand-sub">Support toolkit</div>
+      </div>
+    </div>
+
+    <nav class="nav" role="tablist">
+      <div class="nav-label">Setup</div>
+      <button class="tab active" data-tab="auth" data-title="Authentication" data-desc="Generate and manage the access token (U-Token) used by every API call.">
+        <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Authentication
+      </button>
+      <div class="nav-label">Data</div>
+      <button class="tab" data-tab="products" data-title="Products" data-desc="Look up, create and update products in the store catalog.">
+        <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+        Products
+      </button>
+      <button class="tab" data-tab="orders" data-title="Orders" data-desc="Find orders by ID, date or product, and create or update them.">
+        <svg viewBox="0 0 24 24"><path d="M6 2h12l2 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6l2-4z"/><path d="M4 6h16"/><path d="M9 11h6M9 15h6"/></svg>
+        Orders
+      </button>
+      <button class="tab" data-tab="reviews" data-title="Reviews" data-desc="Browse reviews by store, product or review ID, and submit or update them.">
+        <svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>
+        Reviews
+      </button>
+      <div class="nav-label">On-site</div>
+      <button class="tab" data-tab="widgets" data-title="Widgets" data-desc="List a store's widget instances and preview them live.">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Widgets
+      </button>
+      <div class="nav-label">Session</div>
+      <button class="tab" data-tab="history" data-title="Request history" data-desc="Every request made in this session. Click one to reopen its response.">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        History <span class="count" id="historyCount" hidden>0</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <button type="button" class="ghost small block" id="themeToggle" title="Switch light/dark theme">
+        <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <span>Dark mode</span>
+      </button>
+      <div class="kbd-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> submits the current form</div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="conn">
+        <label class="field compact">
+          <span>Store ID</span>
+          <input id="storeId" placeholder="app_key" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field compact token-field">
+          <span>Access token</span>
+          <span class="token-wrap">
+            <input id="token" type="password" placeholder="Generate on Authentication" autocomplete="off" spellcheck="false">
+            <button type="button" class="icon-btn" id="toggleToken" title="Show/hide token" aria-label="Show token">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </span>
+        </label>
+        <span id="tokenStatus" class="pill muted">No token</span>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-head">
+        <h1 id="pageTitle">Authentication</h1>
+        <p id="pageDesc">Generate and manage the access token (U-Token) used by every API call.</p>
+      </div>
+
+      <!-- AUTH -->
+      <section class="panel active" id="tab-auth">
+        <div class="card">
+          <div class="card-head">
+            <h2>Generate access token</h2>
+            <div class="endpoint"><span class="m post">POST</span><code>/core/v3/stores/{store_id}/access_tokens</code></div>
+          </div>
+          <p class="hint">The token is sent as <code>X-Yotpo-Token</code> on every other call and kept only for this browser session. Your API secret is never saved.</p>
+          <form id="authForm" class="grid">
+            <label class="field">Store ID (app_key)
+              <input id="authStoreId" required autocomplete="off" spellcheck="false">
+            </label>
+            <label class="field">API secret
+              <input id="authSecret" type="password" required autocomplete="off" spellcheck="false">
+            </label>
+            <div class="actions">
+              <button type="submit">Generate token</button>
+              <button type="button" class="ghost" id="testToken">Test current token</button>
+              <button type="button" class="ghost" id="copyToken">Copy token</button>
+              <button type="button" class="ghost danger" id="clearToken">Clear token</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="panel" id="tab-products">
+        <div class="subtabs" data-group="products">
+          <button class="sub active" data-sub="list">Retrieve all</button>
+          <button class="sub" data-sub="byid">By Product ID</button>
+          <button class="sub" data-sub="create">Create</button>
+          <button class="sub" data-sub="update">Update</button>
+        </div>
+
+        <div class="card subpanel active" data-group="products" data-sub="list">
+          <div class="card-head">
+            <h2>Retrieve products</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/core/v3/stores/{store_id}/products</code></div>
+          </div>
+          <form id="productsList" class="grid">
+            <label class="field">Limit (1–100)<input name="limit" type="number" min="1" max="100" value="50"></label>
+            <label class="field">Page info <span class="opt">optional</span><input name="page_info" spellcheck="false"></label>
+            <div class="actions">
+              <button type="submit">Retrieve</button>
+              <button type="button" class="ghost" data-next="productsList" disabled>Next page →</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="products" data-sub="byid">
+          <div class="card-head">
+            <h2>Retrieve by Product ID</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/products?external_ids=… · /products/{yotpo_product_id}</code></div>
+          </div>
+          <form id="productsById" class="grid">
+            <label class="field">ID type
+              <select name="idType">
+                <option value="external">External product ID (store's ID)</option>
+                <option value="yotpo">Yotpo product ID</option>
+              </select>
+            </label>
+            <label class="field">Product ID(s) <span class="opt">up to 100 external IDs, comma-separated</span>
+              <input name="ids" required spellcheck="false">
+            </label>
+            <div class="actions"><button type="submit">Retrieve</button></div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="products" data-sub="create">
+          <div class="card-head">
+            <h2>Create product</h2>
+            <div class="endpoint"><span class="m post">POST</span><code>/core/v3/stores/{store_id}/products</code></div>
+          </div>
+          <p class="hint">Adds a product to the store's Yotpo catalog. The external ID must match the product ID on the store's platform.</p>
+          <form id="productsCreate" class="stack" novalidate>
+            <div class="mode-row">
+              <div class="seg" role="tablist" aria-label="Input mode">
+                <button type="button" class="segbtn active" data-mode="form">Form</button>
+                <button type="button" class="segbtn" data-mode="json">JSON</button>
+              </div>
+            </div>
+
+            <div data-mode-panel="form" class="stack">
+              <fieldset class="section">
+                <legend>Identity</legend>
+                <div class="grid">
+                  <label class="field">External product ID <span class="req-mark">*</span><input name="pc_external_id" maxlength="255" spellcheck="false" placeholder="Store's product ID"></label>
+                  <label class="field">Product name <span class="req-mark">*</span><input name="pc_name" maxlength="255"></label>
+                  <label class="field">Status
+                    <select name="pc_status">
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                      <option value="archived">Archived</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label class="field">SKU <span class="opt">optional</span><input name="pc_sku" maxlength="255" spellcheck="false"></label>
+                  <label class="field">Brand <span class="opt">optional</span><input name="pc_brand" maxlength="255"></label>
+                  <label class="field">Handle <span class="opt">optional</span><input name="pc_handle" spellcheck="false"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Page &amp; media</legend>
+                <div class="stack">
+                  <div class="grid">
+                    <label class="field">Product URL <span class="opt">recommended</span><input name="pc_url" type="url" maxlength="2048" spellcheck="false" placeholder="https://"></label>
+                    <label class="field">Image URL <span class="opt">recommended</span><input name="pc_image_url" type="url" maxlength="2048" spellcheck="false" placeholder="https://"></label>
+                  </div>
+                  <label class="field">Description <span class="opt">optional</span><textarea name="pc_description" rows="3" class="prose"></textarea></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Pricing &amp; inventory</legend>
+                <div class="grid">
+                  <label class="field">Price<input name="pc_price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+                  <label class="field">Compare-at price <span class="opt">optional</span><input name="pc_compare_at_price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+                  <label class="field">Currency<input name="pc_currency" maxlength="3" value="USD" spellcheck="false"></label>
+                  <label class="field">Inventory quantity <span class="opt">optional</span><input name="pc_inventory_quantity" type="number" step="1"></label>
+                  <label class="check"><input type="checkbox" name="pc_is_discontinued"> Discontinued</label>
+                </div>
+              </fieldset>
+
+              <details class="section more">
+                <summary>More options <span class="opt">grouping, identifiers, review settings</span></summary>
+                <div class="grid">
+                  <label class="field">Group name <span class="opt">letters, numbers, _ and -</span><input name="pc_group_name" maxlength="100" spellcheck="false"></label>
+                  <label class="field">MPN<input name="pc_mpn" maxlength="255" spellcheck="false"></label>
+                  <label class="field">GTIN type
+                    <select name="pc_gtin_type">
+                      <option value="UPC">UPC</option>
+                      <option value="EAN">EAN</option>
+                      <option value="ISBN">ISBN</option>
+                    </select>
+                  </label>
+                  <label class="field">GTIN value<input name="pc_gtin_value" spellcheck="false"></label>
+                  <label class="field">Review form tag<input name="pc_review_form_tag" spellcheck="false"></label>
+                  <label class="check"><input type="checkbox" name="pc_is_blocklisted"> Blocklisted (no review requests)</label>
+                </div>
+              </details>
+            </div>
+
+            <div data-mode-panel="json" class="stack" hidden>
+              <label class="field">Request body (JSON)<textarea name="body" rows="18" spellcheck="false"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Create product</button>
+              <button type="button" class="ghost" data-preview-json>Preview payload</button>
+              <button type="button" class="ghost" data-reset>Reset</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="products" data-sub="update">
+          <div class="card-head">
+            <h2>Update product</h2>
+            <div class="endpoint"><span class="m patch">PATCH</span><code>/core/v3/stores/{store_id}/products/{yotpo_product_id}</code></div>
+          </div>
+          <p class="hint">Load the product, edit what you need, and only the changed fields are sent. Empty fields are left unchanged, because the API can't clear a value.</p>
+          <form id="productsUpdate" class="stack" novalidate>
+            <fieldset class="section target">
+              <legend>Product to update</legend>
+              <div class="grid">
+                <label class="field">Yotpo product ID <span class="req-mark">*</span><input name="id" spellcheck="false"></label>
+                <label class="field">Or find by external ID <span class="opt">loads it automatically</span>
+                  <span class="inline"><input name="lookup" spellcheck="false"><button type="button" class="ghost" data-lookup="products">Find</button></span>
+                </label>
+                <div class="load-row">
+                  <button type="button" class="ghost" data-load>Load current values</button>
+                </div>
+              </div>
+              <p class="load-status" data-load-status></p>
+            </fieldset>
+
+            <div class="mode-row">
+              <span class="change-count" data-change-count></span>
+              <div class="seg" role="tablist" aria-label="Input mode">
+                <button type="button" class="segbtn active" data-mode="form">Form</button>
+                <button type="button" class="segbtn" data-mode="json">JSON</button>
+              </div>
+            </div>
+
+            <div data-mode-panel="form" class="stack">
+              <fieldset class="section">
+                <legend>Basics</legend>
+                <div class="grid">
+                  <label class="field">Product name<input name="pu_name" maxlength="255"></label>
+                  <label class="field">Status
+                    <select name="pu_status">
+                      <option value="">No change</option>
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                      <option value="archived">Archived</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label class="field">SKU<input name="pu_sku" maxlength="255" spellcheck="false"></label>
+                  <label class="field">Brand<input name="pu_brand" maxlength="255"></label>
+                  <label class="field">Handle<input name="pu_handle" spellcheck="false"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Page &amp; media</legend>
+                <div class="stack">
+                  <div class="grid">
+                    <label class="field">Product URL<input name="pu_url" type="url" maxlength="2048" spellcheck="false" placeholder="https://"></label>
+                    <label class="field">Image URL<input name="pu_image_url" type="url" maxlength="2048" spellcheck="false" placeholder="https://"></label>
+                  </div>
+                  <label class="field">Description<textarea name="pu_description" rows="3" class="prose"></textarea></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Pricing &amp; inventory</legend>
+                <div class="grid">
+                  <label class="field">Price<input name="pu_price" type="number" min="0" step="0.01"></label>
+                  <label class="field">Compare-at price<input name="pu_compare_at_price" type="number" min="0" step="0.01"></label>
+                  <label class="field">Currency<input name="pu_currency" maxlength="3" spellcheck="false"></label>
+                  <label class="field">Inventory quantity<input name="pu_inventory_quantity" type="number" step="1"></label>
+                  <label class="field">Discontinued
+                    <select name="pu_is_discontinued"><option value="">No change</option><option value="true">Yes</option><option value="false">No</option></select>
+                  </label>
+                </div>
+              </fieldset>
+
+              <details class="section more">
+                <summary>More options <span class="opt">grouping, identifiers, review settings</span></summary>
+                <div class="grid">
+                  <label class="field">Group name <span class="opt">letters, numbers, _ and -</span><input name="pu_group_name" maxlength="100" spellcheck="false"></label>
+                  <label class="field">MPN<input name="pu_mpn" maxlength="255" spellcheck="false"></label>
+                  <label class="field">GTIN type
+                    <select name="pu_gtin_type"><option value="UPC">UPC</option><option value="EAN">EAN</option><option value="ISBN">ISBN</option></select>
+                  </label>
+                  <label class="field">GTIN value <span class="opt">replaces existing GTINs</span><input name="pu_gtin_value" spellcheck="false"></label>
+                  <label class="field">Review form tag<input name="pu_review_form_tag" spellcheck="false"></label>
+                  <label class="field">Blocklisted <span class="opt">no review requests</span>
+                    <select name="pu_is_blocklisted"><option value="">No change</option><option value="true">Yes</option><option value="false">No</option></select>
+                  </label>
+                </div>
+              </details>
+            </div>
+
+            <div data-mode-panel="json" class="stack" hidden>
+              <label class="field">Request body (JSON) <span class="opt">only the fields that will change</span><textarea name="body" rows="14" spellcheck="false"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Update product</button>
+              <button type="button" class="ghost" data-preview-json>Preview payload</button>
+              <button type="button" class="ghost" data-reset>Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section class="panel" id="tab-orders">
+        <div class="subtabs" data-group="orders">
+          <button class="sub active" data-sub="list">Retrieve all</button>
+          <button class="sub" data-sub="byid">By Order ID</button>
+          <button class="sub" data-sub="byproduct">By Product ID</button>
+          <button class="sub" data-sub="create">Create</button>
+          <button class="sub" data-sub="update">Update</button>
+        </div>
+
+        <div class="card subpanel active" data-group="orders" data-sub="list">
+          <div class="card-head">
+            <h2>Retrieve orders</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/core/v3/stores/{store_id}/orders</code></div>
+          </div>
+          <p class="hint">Dates are in your local time zone.</p>
+          <form id="ordersList" class="grid">
+            <label class="field">Limit (1–100)<input name="limit" type="number" min="1" max="100" value="50"></label>
+            <label class="field">Order date from <span class="opt">optional</span><input name="order_date_min" type="datetime-local"></label>
+            <label class="field">Order date to <span class="opt">optional</span><input name="order_date_max" type="datetime-local"></label>
+            <label class="field">Page info <span class="opt">optional</span><input name="page_info" spellcheck="false"></label>
+            <div class="actions">
+              <button type="submit">Retrieve</button>
+              <button type="button" class="ghost" data-next="ordersList" disabled>Next page →</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="orders" data-sub="byid">
+          <div class="card-head">
+            <h2>Retrieve by Order ID</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/orders?external_ids=… · /orders/{yotpo_order_id}</code></div>
+          </div>
+          <form id="ordersById" class="grid">
+            <label class="field">ID type
+              <select name="idType">
+                <option value="external">External order ID (store's order number)</option>
+                <option value="yotpo">Yotpo order ID</option>
+              </select>
+            </label>
+            <label class="field">Order ID(s) <span class="opt">up to 100 external IDs, comma-separated</span>
+              <input name="ids" required spellcheck="false">
+            </label>
+            <div class="actions"><button type="submit">Retrieve</button></div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="orders" data-sub="byproduct">
+          <div class="card-head">
+            <h2>Retrieve orders by Product ID</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/core/v3/stores/{store_id}/orders</code><span class="tag">scan</span></div>
+          </div>
+          <p class="hint">The API has no product filter for orders, so this pages through orders and keeps those whose line items match the external product ID. Narrow the date range to scan faster.</p>
+          <form id="ordersByProduct" class="grid">
+            <label class="field">External product ID<input name="productId" required spellcheck="false"></label>
+            <label class="field">Order date from <span class="opt">optional</span><input name="order_date_min" type="datetime-local"></label>
+            <label class="field">Order date to <span class="opt">optional</span><input name="order_date_max" type="datetime-local"></label>
+            <label class="field">Max pages (100 orders each)<input name="maxPages" type="number" min="1" max="100" value="10"></label>
+            <div class="actions">
+              <button type="submit">Scan orders</button>
+              <button type="button" class="ghost danger" id="stopScan" disabled>Stop</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="orders" data-sub="create">
+          <div class="card-head">
+            <h2>Create order</h2>
+            <div class="endpoint"><span class="m post">POST</span><code>/core/v3/stores/{store_id}/orders</code></div>
+          </div>
+          <p class="hint">Products in line items must already exist in Yotpo. Review requests are only sent for orders with a successful fulfillment.</p>
+          <form id="ordersCreate" class="stack" novalidate>
+            <div class="mode-row">
+              <div class="seg" role="tablist" aria-label="Input mode">
+                <button type="button" class="segbtn active" data-mode="form">Form</button>
+                <button type="button" class="segbtn" data-mode="json">JSON</button>
+              </div>
+            </div>
+
+            <div data-mode-panel="form" class="stack">
+              <fieldset class="section">
+                <legend>Order</legend>
+                <div class="grid">
+                  <label class="field">External order ID <span class="req-mark">*</span>
+                    <span class="inline">
+                      <input name="oc_external_id" spellcheck="false" placeholder="Store's order ID">
+                      <button type="button" class="ghost" id="ocGenerateId" title="Generate a unique test order ID">Generate</button>
+                    </span>
+                  </label>
+                  <label class="field">Order name <span class="opt">optional</span><input name="oc_order_name" placeholder="e.g. #1001"></label>
+                  <label class="field">Order date <span class="req-mark">*</span><input name="oc_order_date" type="datetime-local"></label>
+                  <label class="field">Payment status
+                    <select name="oc_payment_status">
+                      <option value="">Not set</option>
+                      <option value="paid" selected>Paid</option>
+                      <option value="pending">Pending</option>
+                      <option value="authorized">Authorized</option>
+                      <option value="partially_paid">Partially paid</option>
+                      <option value="partially_refunded">Partially refunded</option>
+                      <option value="refunded">Refunded</option>
+                      <option value="voided">Voided</option>
+                    </select>
+                  </label>
+                  <label class="field">Currency<input name="oc_currency" maxlength="3" value="USD" spellcheck="false"></label>
+                  <label class="field">Total price <span class="opt" id="ocTotalHint"></span><input name="oc_total_price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+                  <label class="field">Subtotal price <span class="opt">optional</span><input name="oc_subtotal_price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+                  <label class="field">Payment method <span class="opt">optional</span><input name="oc_payment_method" maxlength="64"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Customer</legend>
+                <div class="grid">
+                  <label class="field">First name <span class="req-mark">*</span><input name="oc_first_name" autocomplete="off"></label>
+                  <label class="field">Last name <span class="req-mark">*</span><input name="oc_last_name" autocomplete="off"></label>
+                  <label class="field">Email <span class="req-mark">*</span><input name="oc_email" type="email" autocomplete="off" spellcheck="false"></label>
+                  <label class="field">Customer ID <span class="opt">optional</span><input name="oc_customer_id" spellcheck="false"></label>
+                  <label class="field">Phone <span class="opt">E.164, e.g. +14155550100</span><input name="oc_phone" type="tel" spellcheck="false"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Line items</legend>
+                <div id="ocLineItems" class="line-items"></div>
+                <div class="section-actions">
+                  <button type="button" class="ghost small" id="ocAddItem">+ Add line item</button>
+                  <button type="button" class="ghost small" id="ocCheckProducts" title="Check that each product exists in the Yotpo catalog">Check products exist</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Fulfillment</legend>
+                <label class="check"><input type="checkbox" name="oc_fulfill" checked> Include a fulfillment for all line items <span class="opt">needed for review requests</span></label>
+                <div class="grid" data-fulfill-fields>
+                  <label class="field">Fulfillment ID <span class="opt">defaults to order ID + "-F1"</span><input name="oc_fulfillment_id" spellcheck="false"></label>
+                  <label class="field">Fulfillment date <span class="req-mark">*</span><input name="oc_fulfillment_date" type="datetime-local"></label>
+                  <label class="field">Status
+                    <select name="oc_fulfillment_status">
+                      <option value="success">Success</option>
+                      <option value="pending">Pending</option>
+                      <option value="open">Open</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="error">Error</option>
+                      <option value="failure">Failure</option>
+                    </select>
+                  </label>
+                  <label class="field">Shipment status <span class="opt">optional</span>
+                    <select name="oc_shipment_status">
+                      <option value="">Not set</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="in_transit">In transit</option>
+                      <option value="out_for_delivery">Out for delivery</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="label_printed">Label printed</option>
+                      <option value="label_purchased">Label purchased</option>
+                      <option value="ready_for_pickup">Ready for pickup</option>
+                      <option value="attempted_delivery">Attempted delivery</option>
+                      <option value="failure">Failure</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+
+              <details class="section more">
+                <summary>More options <span class="opt">shipping address, review request settings</span></summary>
+                <div class="grid">
+                  <label class="field">Address line 1<input name="oc_address1"></label>
+                  <label class="field">Address line 2<input name="oc_address2"></label>
+                  <label class="field">City<input name="oc_city"></label>
+                  <label class="field">State / province<input name="oc_state"></label>
+                  <label class="field">ZIP / postal code<input name="oc_zip"></label>
+                  <label class="field">Country <span class="opt">2-letter code</span><input name="oc_country_code" maxlength="2" placeholder="US"></label>
+                  <label class="field">Landing site URL<input name="oc_landing_site_url" type="url" spellcheck="false" placeholder="https://"></label>
+                  <label class="check"><input type="checkbox" name="oc_coupon_used"> Coupon used</label>
+                  <label class="check"><input type="checkbox" name="oc_suppress_review_request"> Suppress review request</label>
+                </div>
+              </details>
+            </div>
+
+            <div data-mode-panel="json" class="stack" hidden>
+              <label class="field">Request body (JSON)<textarea name="body" rows="22" spellcheck="false"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Create order</button>
+              <button type="button" class="ghost" data-preview-json>Preview payload</button>
+              <button type="button" class="ghost" data-reset>Reset</button>
+            </div>
+          </form>
+
+          <template id="lineItemTpl">
+            <div class="li-row">
+              <label class="field">Product ID <span class="req-mark">*</span><input data-f="external_product_id" spellcheck="false" placeholder="External product ID"></label>
+              <label class="field">Qty <span class="req-mark">*</span><input data-f="quantity" type="number" min="1" step="1" value="1"></label>
+              <label class="field">Line total<input data-f="total_price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+              <label class="field">Variant ID <span class="opt">opt.</span><input data-f="external_variant_id" spellcheck="false"></label>
+              <label class="field">Coupon <span class="opt">opt.</span><input data-f="coupon_code" spellcheck="false"></label>
+              <button type="button" class="icon-btn li-remove" title="Remove line item" aria-label="Remove line item">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <div class="card subpanel" data-group="orders" data-sub="update">
+          <div class="card-head">
+            <h2>Update order</h2>
+            <div class="endpoint"><span class="m patch">PATCH</span><code>/core/v3/stores/{store_id}/orders/{yotpo_order_id}</code></div>
+          </div>
+          <p class="hint">Load the order, edit what you need, and only the changed fields are sent. Empty fields are left unchanged, because the API can't clear a value.</p>
+          <form id="ordersUpdate" class="stack" novalidate>
+            <fieldset class="section target">
+              <legend>Order to update</legend>
+              <div class="grid">
+                <label class="field">Yotpo order ID <span class="req-mark">*</span><input name="id" spellcheck="false"></label>
+                <label class="field">Or find by external order ID <span class="opt">loads it automatically</span>
+                  <span class="inline"><input name="lookup" spellcheck="false"><button type="button" class="ghost" data-lookup="orders">Find</button></span>
+                </label>
+                <div class="load-row">
+                  <button type="button" class="ghost" data-load>Load current values</button>
+                </div>
+              </div>
+              <p class="load-status" data-load-status></p>
+            </fieldset>
+
+            <div class="mode-row">
+              <span class="change-count" data-change-count></span>
+              <div class="seg" role="tablist" aria-label="Input mode">
+                <button type="button" class="segbtn active" data-mode="form">Form</button>
+                <button type="button" class="segbtn" data-mode="json">JSON</button>
+              </div>
+            </div>
+
+            <div data-mode-panel="form" class="stack">
+              <fieldset class="section">
+                <legend>Order</legend>
+                <div class="grid">
+                  <label class="field">Order name<input name="ou_order_name"></label>
+                  <label class="field">Order date<input name="ou_order_date" type="datetime-local"></label>
+                  <label class="field">Payment status
+                    <select name="ou_payment_status">
+                      <option value="">No change</option>
+                      <option value="paid">Paid</option>
+                      <option value="pending">Pending</option>
+                      <option value="authorized">Authorized</option>
+                      <option value="partially_paid">Partially paid</option>
+                      <option value="partially_refunded">Partially refunded</option>
+                      <option value="refunded">Refunded</option>
+                      <option value="voided">Voided</option>
+                    </select>
+                  </label>
+                  <label class="field">Currency<input name="ou_currency" maxlength="3" spellcheck="false"></label>
+                  <label class="field">Total price<input name="ou_total_price" type="number" min="0" step="0.01"></label>
+                  <label class="field">Subtotal price<input name="ou_subtotal_price" type="number" min="0" step="0.01"></label>
+                  <label class="field">Payment method<input name="ou_payment_method" maxlength="64"></label>
+                  <label class="field">Cancellation date <span class="opt">marks the order cancelled</span><input name="ou_cancellation_date" type="datetime-local"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Customer</legend>
+                <div class="grid">
+                  <label class="field">First name<input name="ou_first_name" autocomplete="off"></label>
+                  <label class="field">Last name<input name="ou_last_name" autocomplete="off"></label>
+                  <label class="field">Email<input name="ou_email" type="email" autocomplete="off" spellcheck="false"></label>
+                  <label class="field">Customer ID<input name="ou_customer_id" spellcheck="false"></label>
+                  <label class="field">Phone <span class="opt">E.164, e.g. +14155550100</span><input name="ou_phone" type="tel" spellcheck="false"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Line items</legend>
+                <p class="li-empty" data-li-empty>No line items loaded. Leave this empty to keep the order's current line items. Any you add here replace them.</p>
+                <div id="ouLineItems" class="line-items"></div>
+                <div class="section-actions">
+                  <button type="button" class="ghost small" id="ouAddItem">+ Add line item</button>
+                  <button type="button" class="ghost small" id="ouCheckProducts" title="Check that each product exists in the Yotpo catalog">Check products exist</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Fulfillment</legend>
+                <label class="check"><input type="checkbox" name="ou_fulfill"> Add a fulfillment for the line items <span class="opt">triggers review requests when status is Success</span></label>
+                <p class="hint" data-fulfill-fields>Existing fulfillments on a loaded order are kept. If you don't load the order first, they may be replaced.</p>
+                <div class="grid" data-fulfill-fields>
+                  <label class="field">Fulfillment ID <span class="opt">auto-generated if empty</span><input name="ou_fulfillment_id" spellcheck="false"></label>
+                  <label class="field">Fulfillment date <span class="req-mark">*</span><input name="ou_fulfillment_date" type="datetime-local"></label>
+                  <label class="field">Status
+                    <select name="ou_fulfillment_status">
+                      <option value="success">Success</option>
+                      <option value="pending">Pending</option>
+                      <option value="open">Open</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="error">Error</option>
+                      <option value="failure">Failure</option>
+                    </select>
+                  </label>
+                  <label class="field">Shipment status
+                    <select name="ou_shipment_status">
+                      <option value="">Not set</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="in_transit">In transit</option>
+                      <option value="out_for_delivery">Out for delivery</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="label_printed">Label printed</option>
+                      <option value="label_purchased">Label purchased</option>
+                      <option value="ready_for_pickup">Ready for pickup</option>
+                      <option value="attempted_delivery">Attempted delivery</option>
+                      <option value="failure">Failure</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+
+              <details class="section more">
+                <summary>More options <span class="opt">shipping address, review request settings</span></summary>
+                <div class="grid">
+                  <label class="field">Address line 1<input name="ou_address1"></label>
+                  <label class="field">Address line 2<input name="ou_address2"></label>
+                  <label class="field">City<input name="ou_city"></label>
+                  <label class="field">State / province<input name="ou_state"></label>
+                  <label class="field">ZIP / postal code<input name="ou_zip"></label>
+                  <label class="field">Country <span class="opt">2-letter code</span><input name="ou_country_code" maxlength="2"></label>
+                  <label class="field">Landing site URL<input name="ou_landing_site_url" type="url" spellcheck="false" placeholder="https://"></label>
+                  <label class="field">Coupon used
+                    <select name="ou_coupon_used"><option value="">No change</option><option value="true">Yes</option><option value="false">No</option></select>
+                  </label>
+                  <label class="field">Suppress review request
+                    <select name="ou_suppress_review_request"><option value="">No change</option><option value="true">Yes</option><option value="false">No</option></select>
+                  </label>
+                </div>
+              </details>
+            </div>
+
+            <div data-mode-panel="json" class="stack" hidden>
+              <label class="field">Request body (JSON) <span class="opt">only the fields that will change</span><textarea name="body" rows="16" spellcheck="false"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Update order</button>
+              <button type="button" class="ghost" data-preview-json>Preview payload</button>
+              <button type="button" class="ghost" data-reset>Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- REVIEWS -->
+      <section class="panel" id="tab-reviews">
+        <div class="subtabs" data-group="reviews">
+          <button class="sub active" data-sub="list">Retrieve all</button>
+          <button class="sub" data-sub="byid">By Review ID</button>
+          <button class="sub" data-sub="byproduct">By Product ID</button>
+          <button class="sub" data-sub="create">Create</button>
+          <button class="sub" data-sub="update">Update</button>
+        </div>
+
+        <div class="card subpanel active" data-group="reviews" data-sub="list">
+          <div class="card-head">
+            <h2>Retrieve all reviews</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/v1/apps/{store_id}/reviews</code></div>
+          </div>
+          <p class="hint">Data can lag by about 1 hour.</p>
+          <form id="reviewsList" class="grid">
+            <label class="field">Count (max 100)<input name="count" type="number" min="1" max="100" value="50"></label>
+            <label class="field">Page<input name="page" type="number" min="1" value="1"></label>
+            <label class="field">Created since <span class="opt">optional</span><input name="since_date" type="date"></label>
+            <label class="field">Updated since <span class="opt">optional</span><input name="since_updated_at" type="date"></label>
+            <label class="field">User reference <span class="opt">optional</span><input name="user_reference" spellcheck="false"></label>
+            <label class="check"><input name="deleted" type="checkbox"> Include unpublished / deleted</label>
+            <div class="actions">
+              <button type="submit">Retrieve</button>
+              <button type="button" class="ghost" data-next="reviewsList" disabled>Next page →</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="reviews" data-sub="byid">
+          <div class="card-head">
+            <h2>Retrieve review by Review ID</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>/reviews/{review_id}</code></div>
+          </div>
+          <form id="reviewsById" class="grid">
+            <label class="field">Review ID<input name="id" required spellcheck="false"></label>
+            <div class="actions"><button type="submit">Retrieve</button></div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="reviews" data-sub="byproduct">
+          <div class="card-head">
+            <h2>Retrieve reviews by Product ID</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>api-cdn · /v1/widget/{store_id}/products/{product_id}/reviews.json</code></div>
+          </div>
+          <p class="hint">Uses the <strong>external</strong> product ID. Data can lag by about 3 hours.</p>
+          <form id="reviewsByProduct" class="grid">
+            <label class="field">External product ID<input name="productId" required spellcheck="false"></label>
+            <label class="field">Per page (max 150)<input name="per_page" type="number" min="1" max="150" value="50"></label>
+            <label class="field">Page<input name="page" type="number" min="1" value="1"></label>
+            <label class="field">Star filter
+              <select name="star"><option value="">All</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
+            </label>
+            <label class="field">Sort
+              <select name="sort"><option value="date">Date</option><option value="rating">Rating</option><option value="votes_up">Votes up</option><option value="votes_down">Votes down</option></select>
+            </label>
+            <label class="field">Direction
+              <select name="direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select>
+            </label>
+            <div class="actions"><button type="submit">Retrieve</button></div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="reviews" data-sub="create">
+          <div class="card-head">
+            <h2>Create review</h2>
+            <div class="endpoint"><span class="m post">POST</span><code>/v1/widget/reviews</code></div>
+          </div>
+          <p class="hint">Creation is asynchronous, so the review can take a while to appear. Yotpo emails the reviewer a verification request.</p>
+          <form id="reviewsCreate" class="stack" novalidate>
+            <div class="mode-row">
+              <div class="seg" role="tablist" aria-label="Input mode">
+                <button type="button" class="segbtn active" data-mode="form">Form</button>
+                <button type="button" class="segbtn" data-mode="json">JSON</button>
+              </div>
+            </div>
+
+            <div data-mode-panel="form" class="stack">
+              <fieldset class="section">
+                <legend>Product</legend>
+                <div class="grid">
+                  <label class="field">Review type
+                    <select name="rv_type">
+                      <option value="product">Product review</option>
+                      <option value="site">Site review (store-level)</option>
+                    </select>
+                  </label>
+                  <label class="field" data-product-only>Product ID (SKU) <span class="req-mark">*</span>
+                    <span class="inline">
+                      <input name="rv_sku" spellcheck="false" placeholder="External product ID">
+                      <button type="button" class="ghost" id="rvFillProduct" title="Fill title, URL and image from the product catalog">Fill</button>
+                    </span>
+                  </label>
+                  <label class="field">Product title <span class="req-mark">*</span><input name="rv_product_title"></label>
+                  <label class="field">Product URL <span class="req-mark">*</span><input name="rv_product_url" type="url" spellcheck="false" placeholder="https://"></label>
+                  <label class="field" data-product-only>Product image URL <span class="opt">optional</span><input name="rv_product_image_url" type="url" spellcheck="false" placeholder="https://"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Reviewer</legend>
+                <div class="grid">
+                  <label class="field">Display name <span class="req-mark">*</span><input name="rv_display_name" autocomplete="off"></label>
+                  <label class="field">Email <span class="req-mark">*</span><input name="rv_email" type="email" autocomplete="off" spellcheck="false"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="section">
+                <legend>Review</legend>
+                <div class="stack">
+                  <div class="field">Rating <span class="req-mark">*</span>
+                    <div class="stars" role="radiogroup" aria-label="Rating">
+                      <input type="radio" name="rv_score" id="rvs5" value="5" checked><label for="rvs5" title="5 stars">★</label>
+                      <input type="radio" name="rv_score" id="rvs4" value="4"><label for="rvs4" title="4 stars">★</label>
+                      <input type="radio" name="rv_score" id="rvs3" value="3"><label for="rvs3" title="3 stars">★</label>
+                      <input type="radio" name="rv_score" id="rvs2" value="2"><label for="rvs2" title="2 stars">★</label>
+                      <input type="radio" name="rv_score" id="rvs1" value="1"><label for="rvs1" title="1 star">★</label>
+                      <span class="stars-text" id="rvScoreText">5 / 5</span>
+                    </div>
+                  </div>
+                  <label class="field">Review title <span class="req-mark">*</span><input name="rv_review_title" maxlength="200"></label>
+                  <label class="field">Review content <span class="req-mark">*</span>
+                    <textarea name="rv_review_content" rows="5" class="prose"></textarea>
+                    <span class="char-count" id="rvContentCount">0 characters</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <details class="section more">
+                <summary>More options <span class="opt">incentive, delivery, customer and product details</span></summary>
+                <div class="grid">
+                  <label class="check"><input type="checkbox" name="rv_is_incentivized"> Incentivized review</label>
+                  <label class="field">Incentive type
+                    <select name="rv_incentive_type" disabled>
+                      <option value="free_product">Free product</option>
+                      <option value="coupon">Coupon</option>
+                      <option value="loyalty_points">Loyalty points</option>
+                      <option value="paid_promotion">Paid promotion</option>
+                      <option value="employee_review">Employee review</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label class="field">Delivery type <span class="opt">e.g. standard, express</span><input name="rv_delivery_type"></label>
+                  <label class="check"><input type="checkbox" name="rv_coupon_used"> Coupon used on order</label>
+                  <label class="field">Customer country <span class="opt">2-letter code</span><input name="rv_country" maxlength="2" placeholder="US"></label>
+                  <label class="field">Customer state<input name="rv_state"></label>
+                  <label class="field" data-product-only>Product color<input name="rv_color"></label>
+                  <label class="field" data-product-only>Product size<input name="rv_size"></label>
+                  <label class="field" data-product-only>Product description<input name="rv_product_description"></label>
+                </div>
+              </details>
+            </div>
+
+            <div data-mode-panel="json" class="stack" hidden>
+              <label class="field">Request body (JSON)<textarea name="body" rows="18" spellcheck="false"></textarea></label>
+            </div>
+
+            <div class="actions">
+              <button type="submit">Create review</button>
+              <button type="button" class="ghost" data-preview-json>Preview payload</button>
+              <button type="button" class="ghost" data-reset>Reset</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card subpanel" data-group="reviews" data-sub="update">
+          <div class="card-head">
+            <h2>Update review</h2>
+            <div class="endpoint"><span class="m put">PUT</span><code>/v1/apps/{store_id}/reviews/…</code></div>
+          </div>
+          <p class="hint">Yotpo's API can't edit a review's text or score. You can update the review metadata or the incentivized badge.</p>
+          <form id="reviewsUpdate" class="stack">
+            <div class="grid">
+              <label class="field">Update type
+                <select name="mode">
+                  <option value="metadata">Review metadata</option>
+                  <option value="incentive">Incentivized badge</option>
+                </select>
+              </label>
+              <label class="field" data-show="metadata">Review ID<input name="id" spellcheck="false"></label>
+            </div>
+            <label class="field">Request body (JSON)<textarea name="body" rows="16" spellcheck="false"></textarea></label>
+            <div class="actions">
+              <button type="submit">Update review</button>
+              <button type="button" class="ghost" data-template="reviewUpdate">Reset template</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- WIDGETS -->
+      <section class="panel" id="tab-widgets">
+        <div class="card">
+          <div class="card-head">
+            <h2>Widget explorer</h2>
+            <div class="endpoint"><span class="m get">GET</span><code>cdn-widgetsrepository · /v1/loader/{app_key}</code></div>
+          </div>
+          <p class="hint">Uses Yotpo's public widget loader, so no token is needed.</p>
+          <form id="widgetsLoad" class="grid">
+            <label class="field">App key (Store ID)<input name="appKey" required spellcheck="false" autocomplete="off"></label>
+            <div class="actions"><button type="submit">Load widgets</button></div>
+          </form>
+          <p id="widgetsStatus" class="status-line"></p>
+          <div id="widgetsFilterRow" class="grid filter-row" hidden>
+            <label class="field">Filter by type<select id="widgetsFilter"><option value="">All types</option></select></label>
+            <label class="field">Product ID for preview <span class="opt">optional, shows that product's real data</span>
+              <input id="widgetsProductId" spellcheck="false" placeholder="Empty = demo preview">
+            </label>
+          </div>
+          <div id="widgetsTable" class="table-wrap" hidden></div>
+        </div>
+
+        <div class="card" id="widgetPreviewCard" hidden>
+          <div class="result-head">
+            <h2 id="widgetPreviewTitle">Widget preview</h2>
+            <div class="result-tools">
+              <button type="button" class="ghost small" id="copyEmbed">Copy embed code</button>
+              <button type="button" class="ghost small" id="closePreview">Close</button>
+            </div>
+          </div>
+          <iframe id="widgetPreviewFrame" title="Widget preview"></iframe>
+        </div>
+        <!-- Hidden frame used only to read the widget list -->
+        <iframe id="widgetListFrame" title="Widget loader" hidden></iframe>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="panel" id="tab-history">
+        <div class="card flush">
+          <div class="card-head padded">
+            <h2>Requests this session</h2>
+            <button type="button" class="ghost small" id="clearHistory">Clear</button>
+          </div>
+          <div id="historyList" class="history"><div class="empty">No requests yet.</div></div>
+        </div>
+      </section>
+
+      <!-- RESULT -->
+      <section class="card result" id="result" hidden>
+        <div class="result-head">
+          <div class="req">
+            <span id="resStatus" class="pill"></span>
+            <code id="resLine"></code>
+          </div>
+          <div class="result-tools">
+            <div class="seg">
+              <button class="segbtn active" data-view="table">Table</button>
+              <button class="segbtn" data-view="json">JSON</button>
+            </div>
+            <button class="ghost small" id="copyJson">Copy JSON</button>
+            <button class="ghost small" id="downloadJson">Download</button>
+            <button class="ghost small" id="downloadCsv">CSV</button>
+            <button type="button" class="icon-btn close-btn" id="closeResult" title="Close result (Esc)" aria-label="Close result">
+              <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </div>
+        <p id="resSummary" class="summary"></p>
+        <div id="resTable" class="table-wrap"></div>
+        <pre id="resJson" hidden></pre>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

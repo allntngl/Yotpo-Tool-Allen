@@ -1,0 +1,13 @@
+{
+  "name": "yotpo-tool",
+  "version": "1.0.0",
+  "description": "Local web tool for the Yotpo Core API: access tokens, products, orders and reviews",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
