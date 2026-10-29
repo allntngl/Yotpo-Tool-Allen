@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy</title>
+  <style>
+    :root { --bg: #f6f7f9; --surface: #ffffff; --text: #121826; --muted: #6b7382; --border: #e3e6ea; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --bg: #0d1016; --surface: #151922; --text: #e8ebf0; --muted: #8a93a3; --border: #262c37; color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --bg: #0d1016; --surface: #151922; --text: #e8ebf0; --muted: #8a93a3; --border: #262c37; color-scheme: dark; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+    article { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 28px 28px 20px; }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    h2 { margin: 24px 0 6px; font-size: 16px; }
+    .muted { color: var(--muted); margin: 0 0 8px; font-size: 13px; }
+    a { color: #3657e8; }
+  </style>
+</head>
+<body>
+<main>
+  <article>
+    <h1>Privacy Policy</h1>
+    <p class="muted">Yotpo Tool and the Yotpo Tool Connector extension</p>
+
+    <h2>What the tool does</h2>
+    <p>The Yotpo Tool is a support console for working with a store's data through the Yotpo APIs. The Yotpo Tool Connector is a browser extension that sends the tool's API requests to Yotpo, because browsers block the page from doing so directly.</p>
+
+    <h2>Data handled</h2>
+    <p>When you use the tool, it sends your requests to Yotpo, along with your Yotpo access token. These requests and Yotpo's responses can include store data such as product details, order details and customer names and emails.</p>
+
+    <h2>How it's used</h2>
+    <ul>
+      <li>Data is only sent between the Yotpo Tool page and Yotpo's APIs (<code>api.yotpo.com</code> and <code>api-cdn.yotpo.com</code>), to carry out the action you request.</li>
+      <li>The extension doesn't store, log, sell or share any data, and doesn't send it anywhere else.</li>
+      <li>The tool page keeps your Store ID in your browser so you don't have to retype it, and keeps the access token only for the current browser tab session. Your API secret is never stored.</li>
+      <li>The extension only runs on the Yotpo Tool site and doesn't read or change any other website.</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy: open an issue at <a href="https://github.com/allntngl/Yotpo-Tool-Allen/issues">github.com/allntngl/Yotpo-Tool-Allen</a>.</p>
+  </article>
+</main>
+</body>
+</html>

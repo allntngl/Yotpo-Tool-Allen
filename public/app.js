@@ -1612,18 +1612,72 @@ window.addEventListener("message", (e) => {
   }
 });
 
-// On the hosted version, explain how to install the connector until it's there.
+// ---------- Connector install card (hosted version only) ----------
+// Websites can't install extensions themselves, so the button either opens the
+// Chrome Web Store listing (when config.js has one) or guides a manual install.
+// Once installed, the extension reloads this page and the card disappears.
+
+if (!IS_LOCAL && hasConnector()) {
+  $(".sidebar-foot").insertAdjacentHTML("afterbegin",
+    `<div class="connector-ok"><span class="pill ok">Connector ${esc(document.documentElement.dataset.yotpoConnector)}</span></div>`);
+}
+
 if (!IS_LOCAL && !hasConnector() && !PROXY_URL) {
+  const storeUrl = (window.YOTPO_TOOL_CONFIG?.connectorStoreUrl || "").trim();
+  const ua = navigator.userAgent;
+  const isEdge = ua.includes("Edg/");
+  const isChromium = !!window.chrome && /Chrome\//.test(ua);
+  const extPage = isEdge ? "edge://extensions" : "chrome://extensions";
+
   $(".content").insertAdjacentHTML("afterbegin", `
-    <div class="banner warn">
-      <strong>One-time setup: install the Yotpo Tool Connector.</strong>
-      This small Chrome extension lets the tool call Yotpo without CORS errors. It only works on this site and only talks to Yotpo.
-      Until it's installed, only the Widgets tab works.
-      <ol>
-        <li><a href="${CONNECTOR_ZIP}" download>Download ${CONNECTOR_ZIP}</a> and unzip it.</li>
-        <li>Open <code>chrome://extensions</code> and turn on <strong>Developer mode</strong> (top right).</li>
-        <li>Click <strong>Load unpacked</strong> and choose the unzipped folder (the one containing <code>manifest.json</code>).</li>
-        <li>Reload this page.</li>
-      </ol>
-    </div>`);
+    <section class="install-card" id="installCard">
+      <div class="install-head">
+        <span class="install-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+        </span>
+        <div class="install-text">
+          <h2>Install the Yotpo Tool Connector</h2>
+          <p>A one-time setup. This small browser extension lets the tool call Yotpo without CORS errors.
+             It only runs on this site and only talks to Yotpo. Until it's installed, only the Widgets tab works.</p>
+        </div>
+        ${isChromium
+          ? `<button type="button" class="install-btn" id="installBtn">${storeUrl ? "Add to Chrome" : "Install connector"}</button>`
+          : ""}
+      </div>
+      ${isChromium ? "" : `<p class="install-note">Please open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> to install the connector.</p>`}
+      <div class="install-steps" id="installSteps" hidden>
+        ${storeUrl
+          ? `<p class="install-note">The Chrome Web Store opened in a new tab. Click <strong>Add to Chrome</strong> there.
+               This page reloads automatically once it's installed.</p>`
+          : `<ol>
+               <li><span class="step-n">1</span><div><strong>Unzip the download.</strong>
+                 Find <code>${CONNECTOR_ZIP}</code> in your Downloads, right-click it and choose <strong>Extract All</strong>.
+                 <a href="${CONNECTOR_ZIP}" download>Download again</a></div></li>
+               <li><span class="step-n">2</span><div><strong>Open the extensions page.</strong>
+                 Browsers don't let websites open it, so copy this address into a new tab:
+                 <span class="copy-line"><code>${extPage}</code><button type="button" class="ghost small" id="copyExtPage">Copy</button></span></div></li>
+               <li><span class="step-n">3</span><div><strong>Load it.</strong> Turn on <strong>Developer mode</strong>,
+                 click <strong>Load unpacked</strong>, and select the unzipped folder (the one with <code>manifest.json</code>).</div></li>
+             </ol>
+             <p class="install-note">This page reloads automatically once the connector is installed.</p>`}
+      </div>
+    </section>`);
+
+  $("#installBtn")?.addEventListener("click", () => {
+    if (storeUrl) {
+      window.open(storeUrl, "_blank", "noopener");
+    } else {
+      const a = document.createElement("a");
+      a.href = CONNECTOR_ZIP;
+      a.download = CONNECTOR_ZIP;
+      a.click();
+      toast("Downloading the connector. Follow the steps below.", 3500);
+    }
+    $("#installSteps").hidden = false;
+    $("#installSteps").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  $("#copyExtPage")?.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(extPage); toast(`Copied ${extPage}. Paste it into a new tab.`); }
+    catch { toast(`Couldn't copy. Type ${extPage} into a new tab.`); }
+  });
 }

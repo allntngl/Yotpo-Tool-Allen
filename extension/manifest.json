@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Yotpo Tool Connector",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lets the Yotpo Tool website call the Yotpo APIs without CORS errors. Works only on the Yotpo Tool site and only talks to Yotpo.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "background": {
     "service_worker": "background.js"
   },
   "host_permissions": [
     "https://api.yotpo.com/*",
-    "https://api-cdn.yotpo.com/*"
+    "https://api-cdn.yotpo.com/*",
+    "https://allntngl.github.io/Yotpo-Tool-Allen/*"
   ],
   "content_scripts": [
     {

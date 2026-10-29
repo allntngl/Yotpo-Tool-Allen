@@ -21,11 +21,12 @@ All of them only forward to `https://api.yotpo.com` and `https://api-cdn.yotpo.c
 
 ## Installing the Connector extension (each agent, once)
 
-1. Open the team link. Until the extension is installed, the page shows a setup banner with a download link.
-2. Download `yotpo-tool-connector.zip` from the banner and unzip it.
-3. In Chrome, open `chrome://extensions` and turn on **Developer mode** (top right).
-4. Click **Load unpacked** and select the unzipped folder (the one containing `manifest.json`).
-5. Reload the tool page. The banner disappears and every tab works.
+Open the team link. Until the extension is installed, the page shows an **Install** card.
+
+- **Once it's on the Chrome Web Store** (see `docs/chrome-web-store.md`): click **Add to Chrome**, then **Add to Chrome** again on the store page. The tool page reloads itself, ready to use.
+- **Until then:** click **Install connector**. It downloads `yotpo-tool-connector.zip` and shows three steps: unzip, open `chrome://extensions` and turn on **Developer mode**, then **Load unpacked** and pick the unzipped folder. The tool page reloads itself once it's installed.
+
+Websites can't install extensions on their own, so one of these is always needed. For zero clicks, company IT can force-install it from the Web Store.
 
 The extension only runs on `https://allntngl.github.io/Yotpo-Tool-Allen/` and only has access to the two Yotpo API hosts. It doesn't read other sites. If your company's Chrome policy blocks Developer mode, ask IT to allow the extension, or use the Cloudflare Worker option instead.
 

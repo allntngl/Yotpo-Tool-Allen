@@ -7,6 +7,13 @@ const ALLOWED_HOSTS = new Set(["api.yotpo.com", "api-cdn.yotpo.com"]);
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const ALLOWED_PAGE = "https://allntngl.github.io/Yotpo-Tool-Allen/";
 
+// Reload open tool tabs after install or update so the page picks up the
+// connector straight away (content scripts only attach on page load).
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({ url: `${ALLOWED_PAGE}*` });
+  for (const tab of tabs) chrome.tabs.reload(tab.id);
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type !== "proxy") return false;
   if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(ALLOWED_PAGE)) {
