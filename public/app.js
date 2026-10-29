@@ -128,10 +128,33 @@ async function withBusy(btn, fn) {
 }
 
 // ---------- API call through the proxy ----------
+// Order of preference: the local server (on localhost), the Yotpo Tool
+// Connector browser extension, then a Cloudflare Worker set in config.js.
 
 const PROXY_HELP = IS_LOCAL
   ? "Can't reach the local server. Is `npm start` still running?"
   : "Can't reach the proxy. Check proxyUrl in config.js, and that the Worker's ALLOWED_ORIGINS includes " + location.origin + ".";
+const CONNECTOR_ZIP = "yotpo-tool-connector.zip";
+const hasConnector = () => !IS_LOCAL && !!document.documentElement.dataset.yotpoConnector;
+
+// Sends a request to the extension through its content script and waits for the reply.
+function viaConnector(payload) {
+  return new Promise((resolve) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const timer = setTimeout(() => done({ error: "The connector extension didn't answer. Try reloading the page." }), 60000);
+    function onMessage(e) {
+      if (e.source !== window || e.origin !== location.origin) return;
+      if (e.data?.source === "yotpo-connector" && e.data.id === id) done(e.data.reply);
+    }
+    function done(reply) {
+      clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(reply || { error: "Empty reply from the connector extension" });
+    }
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "yotpo-tool-page", type: "request", id, payload }, location.origin);
+  });
+}
 
 async function api(method, url, { body, auth = true } = {}) {
   const token = auth ? requireToken() : undefined;
@@ -139,22 +162,30 @@ async function api(method, url, { body, auth = true } = {}) {
     showResult({ method, url, status, ok: false, data });
     throw new Error("proxy unreachable");
   };
-  if (!PROXY_URL) fail(0, "The proxy isn't set up for this site yet. Set proxyUrl in config.js to your Cloudflare Worker's /proxy URL.");
-  let res;
-  try {
-    res = await fetch(PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method, url, token, body }),
-    });
-  } catch {
-    fail(0, PROXY_HELP);
+  const payload = { method, url, token, body };
+  let wrap, httpStatus = 200;
+  if (hasConnector()) {
+    wrap = await viaConnector(payload);
+  } else {
+    if (!PROXY_URL) {
+      fail(0, `The Yotpo Tool Connector extension isn't installed. Download ${CONNECTOR_ZIP} from this site, then load it in chrome://extensions (see the setup banner).`);
+    }
+    let res;
+    try {
+      res = await fetch(PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      fail(0, PROXY_HELP);
+    }
+    httpStatus = res.status;
+    try { wrap = await res.json(); }
+    catch { fail(res.status, `The proxy returned an unexpected response (HTTP ${res.status}). ${PROXY_HELP}`); }
   }
-  let wrap;
-  try { wrap = await res.json(); }
-  catch { fail(res.status, `The proxy returned an unexpected response (HTTP ${res.status}). ${PROXY_HELP}`); }
   if (wrap.error) {
-    const out = { method, url, status: res.status, ok: false, data: wrap.error };
+    const out = { method, url, status: httpStatus === 200 ? 0 : httpStatus, ok: false, data: wrap.error };
     showResult(out);
     return out;
   }
@@ -1581,9 +1612,18 @@ window.addEventListener("message", (e) => {
   }
 });
 
-// On the hosted version, warn until the Worker proxy is configured.
-if (!IS_LOCAL && !PROXY_URL) {
-  $(".content").insertAdjacentHTML("afterbegin",
-    `<div class="banner warn"><strong>Setup needed:</strong> the API proxy isn't configured for this site, so only the Widgets tab will work.
-     Set <code>proxyUrl</code> in <code>config.js</code> to your Cloudflare Worker URL (see the README).</div>`);
+// On the hosted version, explain how to install the connector until it's there.
+if (!IS_LOCAL && !hasConnector() && !PROXY_URL) {
+  $(".content").insertAdjacentHTML("afterbegin", `
+    <div class="banner warn">
+      <strong>One-time setup: install the Yotpo Tool Connector.</strong>
+      This small Chrome extension lets the tool call Yotpo without CORS errors. It only works on this site and only talks to Yotpo.
+      Until it's installed, only the Widgets tab works.
+      <ol>
+        <li><a href="${CONNECTOR_ZIP}" download>Download ${CONNECTOR_ZIP}</a> and unzip it.</li>
+        <li>Open <code>chrome://extensions</code> and turn on <strong>Developer mode</strong> (top right).</li>
+        <li>Click <strong>Load unpacked</strong> and choose the unzipped folder (the one containing <code>manifest.json</code>).</li>
+        <li>Reload this page.</li>
+      </ol>
+    </div>`);
 }
