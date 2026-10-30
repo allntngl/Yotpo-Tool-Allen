@@ -1536,6 +1536,7 @@ widgetsForm.addEventListener("submit", (e) => {
   widgetState = { appKey, widgets: [], previewId: "" };
   $("#widgetsTable").hidden = true;
   $("#widgetsFilterRow").hidden = true;
+  $("#widgetsReview").hidden = true;
   $("#widgetPreviewCard").hidden = true;
   widgetStatus("Loading the Yotpo widget loader…");
   listFrame.src = frameUrl({ appKey, t: Date.now() });
@@ -1646,6 +1647,7 @@ window.addEventListener("message", (e) => {
     $("#widgetsFilter").innerHTML = `<option value="">All types (${msg.widgets.length})</option>` +
       types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
     $("#widgetsFilterRow").hidden = false;
+    widgetsReview.hidden = false;
     renderWidgets();
     listFrame.src = "about:blank"; // list captured; free the frame
   } else if (fromList && msg.type === "error") {
