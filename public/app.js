@@ -203,6 +203,13 @@ let current = { out: null, rows: [], cols: [] };
 const fmtDate = (v) => (v ? new Date(v).toLocaleString() : "");
 const C = (label, get, opts = {}) => ({ label, get: typeof get === "string" ? (r) => r[get] : get, ...opts });
 
+// Yotpo files store-level (site) reviews under this reserved product SKU.
+const SITE_SKU = "yotpo_site_reviews";
+function reviewType(r) {
+  const skus = [r.sku, ...(r.products || []).map((p) => (p.Product || p.product || p).domain_key)];
+  return skus.includes(SITE_SKU) ? "Site" : "Product";
+}
+
 const COLS = {
   products: [
     C("Yotpo ID", "yotpo_id", { num: true }),
@@ -231,6 +238,7 @@ const COLS = {
   ],
   reviews: [
     C("Review ID", "id", { num: true }),
+    C("Type", (r) => reviewType(r)),
     C("Score", "score", { num: true }),
     C("Title", (r) => decodeEntities(r.title), { clip: true }),
     C("Content", (r) => decodeEntities(r.content), { clip: true }),
@@ -1346,18 +1354,24 @@ onSubmit("#reviewsList", async (f) => {
     utoken: token, // older v1 endpoints read the token from the query string
   })}`;
   const out = await api("GET", url);
-  const rows = out.data?.reviews || [];
+  const all = out.data?.reviews || [];
   const count = Number(f.elements.count.value) || 10;
-  setNext("reviewsList", out.ok && rows.length >= count ? String((Number(f.elements.page.value) || 1) + 1) : "");
-  showResult({ ...out, url: url.replace(/utoken=[^&]+/, "utoken=…") }, rows, COLS.reviews,
-    out.ok ? `${rows.length} reviews on page ${f.elements.page.value}` : "");
+  setNext("reviewsList", out.ok && all.length >= count ? String((Number(f.elements.page.value) || 1) + 1) : "");
+  // The API can't filter by type, so filter the fetched page here.
+  const type = f.elements.review_type.value;
+  const rows = type ? all.filter((r) => reviewType(r) === type) : all;
+  const sites = all.filter((r) => reviewType(r) === "Site").length;
+  const summary = `${all.length} reviews on page ${f.elements.page.value} (${all.length - sites} product, ${sites} site)` +
+    (type ? `, showing ${rows.length} ${type.toLowerCase()} reviews` : "");
+  showResult({ ...out, url: url.replace(/utoken=[^&]+/, "utoken=…") }, rows, COLS.reviews, out.ok ? summary : "");
 });
 
 onSubmit("#reviewsById", async (f) => {
   const id = encodeURIComponent(f.elements.id.value.trim());
   const out = await api("GET", `${API}/reviews/${id}`, { auth: false });
   const review = out.data?.response?.review;
-  showResult(out, review ? kvRows(review) : [], KV_COLS);
+  showResult(out, review ? [{ field: "review type", value: `${reviewType(review)} review` }, ...kvRows(review)] : [], KV_COLS,
+    review ? `${reviewType(review)} review` : "");
 });
 
 onSubmit("#reviewsByProduct", async (f) => {

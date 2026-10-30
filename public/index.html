@@ -725,6 +725,13 @@
             <label class="field">Created since <span class="opt">optional</span><input name="since_date" type="date"></label>
             <label class="field">Updated since <span class="opt">optional</span><input name="since_updated_at" type="date"></label>
             <label class="field">User reference <span class="opt">optional</span><input name="user_reference" spellcheck="false"></label>
+            <label class="field">Review type
+              <select name="review_type">
+                <option value="">All reviews</option>
+                <option value="Product">Product reviews</option>
+                <option value="Site">Site reviews</option>
+              </select>
+            </label>
             <label class="check"><input name="deleted" type="checkbox"> Include unpublished / deleted</label>
             <div class="actions">
               <button type="submit">Retrieve</button>
