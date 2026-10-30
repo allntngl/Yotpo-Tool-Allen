@@ -733,9 +733,11 @@
               </select>
             </label>
             <label class="check"><input name="deleted" type="checkbox"> Include unpublished / deleted</label>
+            <label class="check"><input name="all_pages" type="checkbox"> Fetch all pages <span class="opt">ignores Count and Page</span></label>
             <div class="actions">
               <button type="submit">Retrieve</button>
               <button type="button" class="ghost" data-next="reviewsList" disabled>Next page →</button>
+              <button type="button" class="ghost danger" data-stop="reviewsList" disabled>Stop</button>
             </div>
           </form>
         </div>
@@ -770,7 +772,11 @@
             <label class="field">Direction
               <select name="direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select>
             </label>
-            <div class="actions"><button type="submit">Retrieve</button></div>
+            <label class="check"><input name="all_pages" type="checkbox"> Fetch all pages <span class="opt">ignores Per page and Page</span></label>
+            <div class="actions">
+              <button type="submit">Retrieve</button>
+              <button type="button" class="ghost danger" data-stop="reviewsByProduct" disabled>Stop</button>
+            </div>
           </form>
         </div>
 

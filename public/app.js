@@ -251,6 +251,7 @@ const COLS = {
   ],
   widgetReviews: [
     C("Review ID", "id", { num: true }),
+    C("Type", (r) => reviewType(r)),
     C("Score", "score", { num: true }),
     C("Title", (r) => decodeEntities(r.title), { clip: true }),
     C("Content", (r) => decodeEntities(r.content), { clip: true }),
@@ -272,6 +273,46 @@ function kvRows(obj, prefix = "") {
   return rows;
 }
 const KV_COLS = [C("Field", "field"), C("Value", "value", { clip: false })];
+
+// Review CSV exports use report-style headers (like the internal_tools_reports
+// exports) instead of the on-screen table columns.
+const csvDate = (v) => (v ? new Date(v).toISOString().slice(0, 19).replace("T", " ") : "");
+const csvBool = (v) => (v ? "true" : "false");
+const REVIEW_CSV_COMMON = [
+  C("Review ID", "id"),
+  C("Review Type", (r) => reviewType(r)),
+  C("Review Score", "score"),
+  C("Review Title", (r) => decodeEntities(r.title)),
+  C("Review Content", (r) => decodeEntities(r.content)),
+];
+const CSV_COLS = new Map([
+  [COLS.reviews, [
+    ...REVIEW_CSV_COMMON,
+    C("Reviewer Name", "name"),
+    C("Reviewer Email", "email"),
+    C("Product ID", "sku"),
+    C("Votes Up", "votes_up"),
+    C("Votes Down", "votes_down"),
+    C("Sentiment", "sentiment"),
+    C("Review Created At", (r) => csvDate(r.created_at)),
+    C("Review Updated At", (r) => csvDate(r.updated_at)),
+    C("Deleted", (r) => csvBool(r.deleted)),
+    C("Archived", (r) => csvBool(r.archived)),
+    C("Incentivized", (r) => csvBool(r.is_incentivized)),
+    C("Incentive Type", "incentive_type"),
+  ]],
+  [COLS.widgetReviews, [
+    ...REVIEW_CSV_COMMON,
+    C("Reviewer Name", (r) => r.user?.display_name),
+    C("Product ID", "sku"),
+    C("Product Internal Product ID", "product_id"),
+    C("Verified Buyer", (r) => csvBool(r.verified_buyer)),
+    C("Votes Up", "votes_up"),
+    C("Votes Down", "votes_down"),
+    C("Sentiment", "sentiment"),
+    C("Review Created At", (r) => csvDate(r.created_at)),
+  ]],
+]);
 
 function showResult(out, rows = null, cols = null, summary = "", fromHistory = false) {
   if (!fromHistory) addHistory(out, rows, cols, summary);
@@ -362,12 +403,22 @@ function download(name, text, type) {
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 $("#downloadJson").addEventListener("click", () => download(`yotpo-${stamp()}.json`, $("#resJson").textContent, "application/json"));
 $("#downloadCsv").addEventListener("click", () => {
-  const cols = current.cols.filter((c) => !c.action);
+  const reviewCols = CSV_COLS.get(current.cols);
+  const cols = reviewCols || current.cols.filter((c) => !c.action);
   if (!current.rows.length || !cols.length) return toast("Nothing to export as CSV");
-  const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  // Quote only cells that need it, as the report exports do.
+  const cell = (v) => {
+    const s = String(v ?? "");
+    return /[",\r\n]|^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const lines = [cols.map((c) => cell(c.label)).join(",")];
   current.rows.forEach((r) => lines.push(cols.map((c) => cell(c.get(r))).join(",")));
-  download(`yotpo-${stamp()}.csv`, "﻿" + lines.join("\r\n"), "text/csv");
+  // Report-style name, e.g. "yotpo_reviews <store id> 2026-10-30T1545.csv".
+  const d = new Date(), pad = (n) => String(n).padStart(2, "0");
+  const name = reviewCols
+    ? `yotpo_reviews ${storeIdEl.value.trim()} ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}.csv`
+    : `yotpo-${stamp()}.csv`;
+  download(name, "﻿" + lines.join("\r\n") + "\r\n", "text/csv");
 });
 
 // ---------- tabs ----------
@@ -1341,29 +1392,67 @@ $("#resTable").addEventListener("click", (e) => {
 
 // ---------- Reviews ----------
 
+// "Fetch all pages": Yotpo caps each request (100 or 150 reviews), so request
+// page after page until a short page comes back or Stop is pressed.
+const stopPaging = {};
+$$("[data-stop]").forEach((b) => b.addEventListener("click", () => { stopPaging[b.dataset.stop] = true; }));
+
+async function fetchAllPages(formId, perPage, fetchPage) {
+  const stopBtn = $(`[data-stop="${formId}"]`);
+  stopPaging[formId] = false;
+  stopBtn.disabled = false;
+  const rows = [];
+  let page = 0, last;
+  try {
+    do {
+      last = await fetchPage(++page);
+      if (!last.out.ok) break;
+      rows.push(...last.rows);
+      toast(`Fetched ${rows.length} reviews…`, 1500);
+    } while (last.rows.length >= perPage && !stopPaging[formId]);
+  } finally {
+    stopBtn.disabled = true;
+  }
+  return { out: last.out, rows, pages: page, stopped: stopPaging[formId] };
+}
+
 onSubmit("#reviewsList", async (f) => {
   const sid = requireStoreId();
   const token = requireToken();
-  const url = `${API}/v1/apps/${sid}/reviews${qs({
-    count: f.elements.count.value,
-    page: f.elements.page.value,
+  const allPages = f.elements.all_pages.checked;
+  const count = allPages ? 100 : Number(f.elements.count.value) || 10;
+  const urlFor = (page) => `${API}/v1/apps/${sid}/reviews${qs({
+    count,
+    page,
     since_date: f.elements.since_date.value,
     since_updated_at: f.elements.since_updated_at.value,
     user_reference: f.elements.user_reference.value.trim(),
     deleted: f.elements.deleted.checked ? "true" : "",
     utoken: token, // older v1 endpoints read the token from the query string
   })}`;
-  const out = await api("GET", url);
-  const all = out.data?.reviews || [];
-  const count = Number(f.elements.count.value) || 10;
-  setNext("reviewsList", out.ok && all.length >= count ? String((Number(f.elements.page.value) || 1) + 1) : "");
-  // The API can't filter by type, so filter the fetched page here.
+  const getPage = async (page) => {
+    const out = await api("GET", urlFor(page));
+    return { out, rows: out.data?.reviews || [] };
+  };
+  let out, all, where;
+  if (allPages) {
+    const res = await fetchAllPages("reviewsList", count, getPage);
+    ({ out, rows: all } = res);
+    setNext("reviewsList", "");
+    where = `across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
+  } else {
+    const page = Number(f.elements.page.value) || 1;
+    ({ out, rows: all } = await getPage(page));
+    setNext("reviewsList", out.ok && all.length >= count ? String(page + 1) : "");
+    where = `on page ${page}`;
+  }
+  // The API can't filter by type, so filter the fetched reviews here.
   const type = f.elements.review_type.value;
   const rows = type ? all.filter((r) => reviewType(r) === type) : all;
   const sites = all.filter((r) => reviewType(r) === "Site").length;
-  const summary = `${all.length} reviews on page ${f.elements.page.value} (${all.length - sites} product, ${sites} site)` +
+  const summary = `${all.length} reviews ${where} (${all.length - sites} product, ${sites} site)` +
     (type ? `, showing ${rows.length} ${type.toLowerCase()} reviews` : "");
-  showResult({ ...out, url: url.replace(/utoken=[^&]+/, "utoken=…") }, rows, COLS.reviews, out.ok ? summary : "");
+  showResult({ ...out, url: out.url.replace(/utoken=[^&]+/, "utoken=…") }, rows, COLS.reviews, out.ok ? summary : "");
 });
 
 onSubmit("#reviewsById", async (f) => {
@@ -1376,19 +1465,34 @@ onSubmit("#reviewsById", async (f) => {
 
 onSubmit("#reviewsByProduct", async (f) => {
   const sid = requireStoreId();
-  const pid = encodeURIComponent(f.elements.productId.value.trim());
-  const url = `${CDN}/v1/widget/${sid}/products/${pid}/reviews.json${qs({
-    per_page: f.elements.per_page.value,
-    page: f.elements.page.value,
-    star: f.elements.star.value,
-    sort: f.elements.sort.value,
-    direction: f.elements.direction.value,
-  })}`;
-  const out = await api("GET", url, { auth: false });
-  const r = out.data?.response;
-  const bl = r?.bottomline;
-  const summary = bl ? `${bl.total_review} total reviews · average ${Number(bl.average_score).toFixed(2)} · page ${r.pagination?.page} of ${Math.max(1, Math.ceil((r.pagination?.total || 0) / (r.pagination?.per_page || 1)))}` : "";
-  showResult(out, r?.reviews || [], COLS.widgetReviews, out.ok ? summary : "");
+  const productId = f.elements.productId.value.trim();
+  const pid = encodeURIComponent(productId);
+  const allPages = f.elements.all_pages.checked;
+  const perPage = allPages ? 150 : Number(f.elements.per_page.value) || 50;
+  const getPage = async (page) => {
+    const out = await api("GET", `${CDN}/v1/widget/${sid}/products/${pid}/reviews.json${qs({
+      per_page: perPage,
+      page,
+      star: f.elements.star.value,
+      sort: f.elements.sort.value,
+      direction: f.elements.direction.value,
+    })}`, { auth: false });
+    // Widget reviews don't carry the external product ID; add it for the table and CSV.
+    return { out, rows: (out.data?.response?.reviews || []).map((rv) => ({ ...rv, sku: productId })) };
+  };
+  let out, rows, where;
+  if (allPages) {
+    const res = await fetchAllPages("reviewsByProduct", perPage, getPage);
+    ({ out, rows } = res);
+    where = `fetched ${rows.length} across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
+  } else {
+    ({ out, rows } = await getPage(Number(f.elements.page.value) || 1));
+    const p = out.data?.response?.pagination;
+    where = `page ${p?.page} of ${Math.max(1, Math.ceil((p?.total || 0) / (p?.per_page || 1)))}`;
+  }
+  const bl = out.data?.response?.bottomline;
+  const summary = bl ? `${bl.total_review} total reviews · average ${Number(bl.average_score).toFixed(2)} · ${where}` : "";
+  showResult(out, rows, COLS.widgetReviews, out.ok ? summary : "");
 });
 
 // Create review
