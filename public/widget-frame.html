@@ -18,7 +18,6 @@
     const appKey = params.get("appKey") || "";
     const instanceId = params.get("instanceId") || "";
     const productId = params.get("productId") || "";
-    const reviewId = params.get("reviewId") || "";
     const mount = document.getElementById("mount");
 
     const post = (msg) => parent.postMessage({ source: "yotpo-widget-frame", ...msg }, location.origin);
@@ -79,26 +78,8 @@
       try {
         container.initWidget(instanceId, div);
         post({ type: "rendered", instanceId });
-        if (reviewId) findReview(Date.now());
       } catch (err) {
         post({ type: "error", message: "Widget failed to initialize: " + err.message });
-      }
-    }
-
-    // Reviews render asynchronously, so poll until the requested review shows
-    // up, then outline it and tell the parent where it is so it can scroll there.
-    function findReview(started) {
-      const el = document.querySelector(`[data-review-id="${CSS.escape(reviewId)}"]`) ||
-        document.getElementById("yotpo-review-" + reviewId) ||
-        [...document.querySelectorAll("[id]")].find((n) => n.id.endsWith("-" + reviewId) || n.id === reviewId);
-      if (el) {
-        el.style.outline = "3px solid #f5a623";
-        el.style.outlineOffset = "4px";
-        post({ type: "review", found: true, reviewId, top: el.getBoundingClientRect().top + window.scrollY });
-      } else if (Date.now() - started > 15000) {
-        post({ type: "review", found: false, reviewId });
-      } else {
-        setTimeout(() => findReview(started), 300);
       }
     }
   </script>

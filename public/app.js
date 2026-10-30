@@ -1536,7 +1536,6 @@ widgetsForm.addEventListener("submit", (e) => {
   widgetState = { appKey, widgets: [], previewId: "" };
   $("#widgetsTable").hidden = true;
   $("#widgetsFilterRow").hidden = true;
-  $("#widgetsReview").hidden = true;
   $("#widgetPreviewCard").hidden = true;
   widgetStatus("Loading the Yotpo widget loader…");
   listFrame.src = frameUrl({ appKey, t: Date.now() });
@@ -1563,60 +1562,15 @@ function previewWidget(instanceId) {
   const w = widgetState.widgets.find((x) => x.instanceId === instanceId);
   widgetState.previewId = instanceId;
   const productId = $("#widgetsProductId").value.trim();
-  const reviewId = widgetsReview.elements.reviewId.value.trim();
-  $("#widgetPreviewTitle").textContent = `Widget preview: ${w?.className || ""} (${instanceId})` +
-    `${productId ? `, product ${productId}` : ""}${reviewId ? `, review ${reviewId}` : ""}`;
+  $("#widgetPreviewTitle").textContent = `Widget preview: ${w?.className || ""} (${instanceId})${productId ? `, product ${productId}` : ""}`;
   previewFrame.style.height = "200px";
-  previewFrame.src = frameUrl({ appKey: widgetState.appKey, instanceId, productId, reviewId, t: Date.now() });
+  previewFrame.src = frameUrl({ appKey: widgetState.appKey, instanceId, productId, t: Date.now() });
   $("#widgetPreviewCard").hidden = false;
   $("#widgetPreviewCard").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 $("#widgetsTable").addEventListener("click", (e) => {
   const b = e.target.closest("[data-preview]");
   if (b) previewWidget(b.dataset.preview);
-});
-
-// Review lookup: fetch one review, fill in its product so the preview shows
-// that product's widget, and have the preview frame highlight the review.
-const widgetsReview = $("#widgetsReview");
-
-function reviewProduct(review) {
-  const p = (review.products || []).map((x) => x.Product || x.product || x)[0];
-  return { id: p?.domain_key || review.sku || "", name: p?.name || "" };
-}
-
-onSubmit("#widgetsReview", async (f) => {
-  const id = f.elements.reviewId.value.trim();
-  if (!id) { toast("Enter a review ID first."); return; }
-  const out = await api("GET", `${API}/reviews/${encodeURIComponent(id)}`, { auth: false });
-  const review = out.data?.response?.review;
-  if (!out.ok || !review) {
-    if (out.ok) showResult(out);
-    $("#widgetsReviewCard").hidden = true;
-    return;
-  }
-  const product = reviewProduct(review);
-  if (product.id) $("#widgetsProductId").value = product.id;
-  const score = Math.max(0, Math.min(5, Number(review.score) || 0));
-  $("#widgetsReviewCard").innerHTML = `
-    <div class="rc-head">
-      <span class="rc-stars" aria-label="${score} out of 5">${"★".repeat(score)}${"☆".repeat(5 - score)}</span>
-      <span>Review ${esc(review.id)}</span>
-      <span>${esc(review.user?.display_name || "")}</span>
-      <span>${esc(fmtDate(review.created_at))}</span>
-      ${review.verified_buyer ? "<span>Verified buyer</span>" : ""}
-      <span>${product.id ? `Product ${esc(product.id)}${product.name ? ` (${esc(decodeEntities(product.name))})` : ""}` : "Site review"}</span>
-    </div>
-    <p class="rc-title">${esc(decodeEntities(review.title || ""))}</p>
-    <p class="rc-body">${esc(decodeEntities(review.content || ""))}</p>`;
-  $("#widgetsReviewCard").hidden = false;
-  toast(product.id ? `Product ID set to ${product.id}. Click Preview on a reviews widget.` : "Review found. It isn't tied to a product.");
-  if (widgetState.previewId) previewWidget(widgetState.previewId);
-});
-
-$("#clearReview").addEventListener("click", () => {
-  widgetsReview.elements.reviewId.value = "";
-  $("#widgetsReviewCard").hidden = true;
 });
 
 $("#closePreview").addEventListener("click", () => {
@@ -1647,19 +1601,12 @@ window.addEventListener("message", (e) => {
     $("#widgetsFilter").innerHTML = `<option value="">All types (${msg.widgets.length})</option>` +
       types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
     $("#widgetsFilterRow").hidden = false;
-    widgetsReview.hidden = false;
     renderWidgets();
     listFrame.src = "about:blank"; // list captured; free the frame
   } else if (fromList && msg.type === "error") {
     widgetStatus(msg.message, true);
   } else if (fromPreview && msg.type === "height") {
     previewFrame.style.height = `${Math.max(200, msg.height)}px`;
-  } else if (fromPreview && msg.type === "review") {
-    if (msg.found) {
-      window.scrollTo({ top: previewFrame.getBoundingClientRect().top + window.scrollY + msg.top - 80, behavior: "smooth" });
-    } else {
-      toast(`Review ${msg.reviewId} isn't on this widget's first page. Try sorting or paging in the widget.`, 4500);
-    }
   } else if (fromPreview && msg.type === "error") {
     toast(msg.message, 4000);
   }
