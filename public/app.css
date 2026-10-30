@@ -343,6 +343,11 @@ pre {
 .status-line:empty { display: none; }
 .status-line.err { color: var(--err); }
 .filter-row { margin: 16px 0 14px; }
+.review-card { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.review-card .rc-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; color: var(--text-2); }
+.review-card .rc-stars { color: #f5a623; letter-spacing: 1px; }
+.review-card .rc-title { margin: 6px 0 2px; font-weight: 600; color: inherit; }
+.review-card .rc-body { margin: 0; white-space: pre-wrap; }
 #widgetPreviewFrame {
   display: block; width: 100%; min-height: 200px; border: 1px solid var(--border);
   border-radius: var(--radius-sm); background: #ffffff;
