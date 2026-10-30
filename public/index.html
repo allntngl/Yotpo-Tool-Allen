@@ -912,16 +912,16 @@
             <label class="field">Product ID for preview <span class="opt">optional, shows that product's real data</span>
               <input id="widgetsProductId" spellcheck="false" placeholder="Empty = demo preview">
             </label>
+            <form id="widgetsReview">
+              <label class="field">Review ID <span class="opt">optional, finds its product and highlights it</span>
+                <span class="inline">
+                  <input name="reviewId" spellcheck="false" autocomplete="off" placeholder="e.g. 123456789">
+                  <button type="submit">Find</button>
+                  <button type="button" class="ghost" id="clearReview">Clear</button>
+                </span>
+              </label>
+            </form>
           </div>
-          <form id="widgetsReview" class="grid filter-row" hidden>
-            <label class="field">Review ID <span class="opt">optional, finds that review's product and highlights it</span>
-              <input name="reviewId" spellcheck="false" autocomplete="off" placeholder="e.g. 123456789">
-            </label>
-            <div class="actions">
-              <button type="submit">Find review</button>
-              <button type="button" class="ghost" id="clearReview">Clear</button>
-            </div>
-          </form>
           <div id="widgetsReviewCard" class="review-card" hidden></div>
           <div id="widgetsTable" class="table-wrap" hidden></div>
         </div>
