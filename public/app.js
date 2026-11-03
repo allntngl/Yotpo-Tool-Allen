@@ -285,43 +285,77 @@ function kvRows(obj, prefix = "") {
 const KV_COLS = [C("Field", "field"), C("Value", "value", { clip: false })];
 
 // Review CSV exports use report-style headers (like the internal_tools_reports
-// exports) instead of the on-screen table columns.
+// exports) instead of the on-screen table columns. Both review APIs share one
+// column list; each getter tries the field names either API uses, and a column
+// is left blank when the API doesn't return that data.
 const csvDate = (v) => (v ? new Date(v).toISOString().slice(0, 19).replace("T", " ") : "");
-const csvBool = (v) => (v ? "true" : "false");
-const REVIEW_CSV_COMMON = [
+const yesNo = (v) => (v ? "Yes" : "No");
+const yesNoOrBlank = (v) => (v == null ? "" : yesNo(v));
+const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+const joinVals = (arr) => arr.filter((x) => x != null && x !== "").join(", ");
+const tagNames = (v) => joinVals(list(v).map((t) => (typeof t === "object" ? t.name ?? t.label ?? t.value : t)));
+
+// The review's product: added by the by-product fetch, or nested in the v1 review.
+function reviewProduct(r) {
+  if (r._product) return r._product;
+  const p = (r.products || [])[0];
+  return (p && (p.Product || p.product || p)) || {};
+}
+const productImage = (p) => p.image_url || p.images?.[0]?.image_url || p.images?.[0]?.big_image_url || "";
+
+// Media is published unless the API marks it otherwise.
+const isPublished = (m) => !(m.is_published === false || m.published === false || m.status === "unpublished" || m.deleted);
+const mediaUrls = (items, published, keys) =>
+  joinVals(list(items).filter((m) => isPublished(m) === published).map((m) => keys.map((k) => m[k]).find(Boolean)));
+const IMAGE_KEYS = ["original_url", "image_url", "big_image_url", "url", "thumb_url"];
+const VIDEO_KEYS = ["video_url", "url", "original_url", "external_url"];
+const reviewImages = (r) => r.images_data || r.images || [];
+const reviewVideos = (r) => r.videos_data || r.videos || [];
+
+function reviewComment(r) {
+  const c = r.comment || (r.comments || [])[0];
+  return c && typeof c === "object" ? c : null;
+}
+
+// Custom questions come back keyed by field ID: { "--123": { title, value } }.
+function customQuestions(r) {
+  const fields = r.custom_fields || r.custom_questions || {};
+  return Object.values(fields)
+    .map((q) => (q && typeof q === "object" ? `${q.title ?? q.question ?? ""}: ${list(q.value ?? q.answer).join(", ")}` : q))
+    .filter(Boolean).join("; ");
+}
+
+const REVIEW_CSV = [
+  C("Review App Key", (r) => r.appkey || r.app_key || storeIdEl.value.trim()),
   C("Review ID", "id"),
-  C("Review Type", (r) => reviewType(r)),
-  C("Review Score", "score"),
-  C("Review Title", (r) => decodeEntities(r.title)),
+  C("Review Created Date", (r) => csvDate(r.created_at)),
+  C("Review Is Published (Yes / No)", (r) => yesNo(r.published ?? !(r.deleted || r.archived))),
   C("Review Content", (r) => decodeEntities(r.content)),
+  C("Review Title", (r) => decodeEntities(r.title)),
+  C("Review Score", "score"),
+  C("Review Reviewer Name", (r) => r.name || r.user?.display_name),
+  C("Review Reviewer Email", (r) => r.email || r.user?.email),
+  C("Review Is Verified Buyer (Yes / No)", (r) => yesNoOrBlank(r.verified_buyer ?? r.is_verified_buyer)),
+  C("Review Country Code", (r) => r.country_code || r.customer_metadata?.country || r.user?.country || r.user?.country_code),
+  C("Product ID", (r) => r.sku || reviewProduct(r).domain_key),
+  C("Product Name", (r) => reviewProduct(r).name),
+  C("Product Group", (r) => reviewProduct(r).group_name || reviewProduct(r).group),
+  C("Product Tags", (r) => tagNames(reviewProduct(r).product_tags || reviewProduct(r).tags)),
+  C("Product URL", (r) => reviewProduct(r).product_url || reviewProduct(r).product_link || reviewProduct(r).url),
+  C("Product Image URL", (r) => productImage(reviewProduct(r))),
+  C("Images Published Image URL", (r) => mediaUrls(reviewImages(r), true, IMAGE_KEYS)),
+  C("Images Unpublished Image URL", (r) => mediaUrls(reviewImages(r), false, IMAGE_KEYS)),
+  C("Comment Is Public (Yes / No)", (r) => { const c = reviewComment(r); return c ? yesNo(c.public ?? c.is_public) : ""; }),
+  C("Comment Content", (r) => decodeEntities(reviewComment(r)?.content)),
+  C("Comment Created At", (r) => { const c = reviewComment(r); return c ? csvDate(c.created_at || c.comment_date) : ""; }),
+  C("Review Tags", (r) => tagNames(r.tags || r.review_tags)),
+  C("Videos Published URL", (r) => mediaUrls(reviewVideos(r), true, VIDEO_KEYS)),
+  C("Videos Unpublished URL", (r) => mediaUrls(reviewVideos(r), false, VIDEO_KEYS)),
+  C("Review Custom Questions", (r) => customQuestions(r)),
 ];
 const CSV_COLS = new Map([
-  [COLS.reviews, [
-    ...REVIEW_CSV_COMMON,
-    C("Reviewer Name", "name"),
-    C("Reviewer Email", "email"),
-    C("Product ID", "sku"),
-    C("Votes Up", "votes_up"),
-    C("Votes Down", "votes_down"),
-    C("Sentiment", "sentiment"),
-    C("Review Created At", (r) => csvDate(r.created_at)),
-    C("Review Updated At", (r) => csvDate(r.updated_at)),
-    C("Deleted", (r) => csvBool(r.deleted)),
-    C("Archived", (r) => csvBool(r.archived)),
-    C("Incentivized", (r) => csvBool(r.is_incentivized)),
-    C("Incentive Type", "incentive_type"),
-  ]],
-  [COLS.widgetReviews, [
-    ...REVIEW_CSV_COMMON,
-    C("Reviewer Name", (r) => r.user?.display_name),
-    C("Product ID", "sku"),
-    C("Product Internal Product ID", "product_id"),
-    C("Verified Buyer", (r) => csvBool(r.verified_buyer)),
-    C("Votes Up", "votes_up"),
-    C("Votes Down", "votes_down"),
-    C("Sentiment", "sentiment"),
-    C("Review Created At", (r) => csvDate(r.created_at)),
-  ]],
+  [COLS.reviews, REVIEW_CSV],
+  [COLS.widgetReviews, REVIEW_CSV],
 ]);
 
 function showResult(out, rows = null, cols = null, summary = "", fromHistory = false) {
@@ -1468,8 +1502,14 @@ onSubmit("#reviewsByProduct", async (f) => {
       sort: f.elements.sort.value,
       direction: f.elements.direction.value,
     })}`, { auth: false });
-    // Widget reviews don't carry the external product ID; add it for the table and CSV.
-    return { out, rows: (out.data?.response?.reviews || []).map((rv) => ({ ...rv, sku: productId })) };
+    // Widget reviews don't carry the external product ID or product details;
+    // add them from the response's product list for the table and CSV.
+    const products = out.data?.response?.products || [];
+    return { out, rows: (out.data?.response?.reviews || []).map((rv) => ({
+      ...rv,
+      sku: productId,
+      _product: products.find((p) => p.id === rv.product_id) || products[0],
+    })) };
   };
   const res = await fetchAllPages("reviewsByProduct", perPage, getPage);
   const { out, rows } = res;
