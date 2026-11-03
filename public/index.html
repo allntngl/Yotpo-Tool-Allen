@@ -718,10 +718,8 @@
             <h2>Retrieve all reviews</h2>
             <div class="endpoint"><span class="m get">GET</span><code>/v1/apps/{store_id}/reviews</code></div>
           </div>
-          <p class="hint">Data can lag by about 1 hour.</p>
+          <p class="hint">Fetches every page of reviews (100 per request). Data can lag by about 1 hour.</p>
           <form id="reviewsList" class="grid">
-            <label class="field">Count (max 100)<input name="count" type="number" min="1" max="100" value="50"></label>
-            <label class="field">Page<input name="page" type="number" min="1" value="1"></label>
             <label class="field">Created since <span class="opt">optional</span><input name="since_date" type="date"></label>
             <label class="field">Updated since <span class="opt">optional</span><input name="since_updated_at" type="date"></label>
             <label class="field">User reference <span class="opt">optional</span><input name="user_reference" spellcheck="false"></label>
@@ -733,10 +731,8 @@
               </select>
             </label>
             <label class="check"><input name="deleted" type="checkbox"> Include unpublished / deleted</label>
-            <label class="check"><input name="all_pages" type="checkbox"> Fetch all pages <span class="opt">ignores Count and Page</span></label>
             <div class="actions">
               <button type="submit">Retrieve</button>
-              <button type="button" class="ghost" data-next="reviewsList" disabled>Next page →</button>
               <button type="button" class="ghost danger" data-stop="reviewsList" disabled>Stop</button>
             </div>
           </form>

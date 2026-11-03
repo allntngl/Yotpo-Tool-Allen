@@ -210,17 +210,27 @@ function reviewType(r) {
   return skus.includes(SITE_SKU) ? "Site" : "Product";
 }
 
+// Products carry UPC/EAN/ISBN in a gtins list; pick the value(s) of one type.
+const gtin = (r, type) => (r.gtins || []).filter((g) => (g.declared_type || "").toUpperCase() === type).map((g) => g.value).join(", ");
+
 const COLS = {
   products: [
-    C("Yotpo ID", "yotpo_id", { num: true }),
-    C("External ID", "external_id"),
-    C("Name", "name", { clip: true }),
-    C("Status", "status"),
-    C("Price", (r) => (r.price != null ? `${r.price} ${r.currency || ""}` : ""), { num: true }),
-    C("SKU", "sku"),
-    C("Group", "group_name"),
-    C("URL", "url", { clip: true }),
-    C("Updated", (r) => fmtDate(r.updated_at)),
+    C("Product Internal Product ID", "yotpo_id", { num: true }),
+    C("Product ID", "external_id"),
+    C("Product Name", "name", { clip: true }),
+    C("Product URL", "url", { clip: true }),
+    C("Product Image URL", "image_url", { clip: true }),
+    C("Product Price", "price", { num: true }),
+    C("Currency", "currency"),
+    C("Spec UPC", (r) => gtin(r, "UPC")),
+    C("Spec SKU", "sku"),
+    C("Spec Brand", "brand"),
+    C("Spec MPN", "mpn"),
+    C("Spec ISBN", (r) => gtin(r, "ISBN")),
+    C("Spec EAN", (r) => gtin(r, "EAN")),
+    C("Product Tags", (r) => r.custom_properties?.review_form_tag),
+    C("Blacklisted", (r) => (r.custom_properties?.is_blocklisted ? "true" : "false")),
+    C("Product Group", "group_name"),
     C("", (r) => ({ action: "editProduct", id: r.yotpo_id, label: "Edit" }), { action: true }),
   ],
   orders: [
@@ -415,8 +425,9 @@ $("#downloadCsv").addEventListener("click", () => {
   current.rows.forEach((r) => lines.push(cols.map((c) => cell(c.get(r))).join(",")));
   // Report-style name, e.g. "yotpo_reviews <store id> 2026-10-30T1545.csv".
   const d = new Date(), pad = (n) => String(n).padStart(2, "0");
-  const name = reviewCols
-    ? `yotpo_reviews ${storeIdEl.value.trim()} ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}.csv`
+  const report = reviewCols ? "yotpo_reviews" : current.cols === COLS.products ? "yotpo_products" : "";
+  const name = report
+    ? `${report} ${storeIdEl.value.trim()} ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}.csv`
     : `yotpo-${stamp()}.csv`;
   download(name, "﻿" + lines.join("\r\n") + "\r\n", "text/csv");
 });
@@ -1419,8 +1430,7 @@ async function fetchAllPages(formId, perPage, fetchPage) {
 onSubmit("#reviewsList", async (f) => {
   const sid = requireStoreId();
   const token = requireToken();
-  const allPages = f.elements.all_pages.checked;
-  const count = allPages ? 100 : Number(f.elements.count.value) || 10;
+  const count = 100; // API maximum per request; every page is fetched
   const urlFor = (page) => `${API}/v1/apps/${sid}/reviews${qs({
     count,
     page,
@@ -1434,18 +1444,9 @@ onSubmit("#reviewsList", async (f) => {
     const out = await api("GET", urlFor(page));
     return { out, rows: out.data?.reviews || [] };
   };
-  let out, all, where;
-  if (allPages) {
-    const res = await fetchAllPages("reviewsList", count, getPage);
-    ({ out, rows: all } = res);
-    setNext("reviewsList", "");
-    where = `across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
-  } else {
-    const page = Number(f.elements.page.value) || 1;
-    ({ out, rows: all } = await getPage(page));
-    setNext("reviewsList", out.ok && all.length >= count ? String(page + 1) : "");
-    where = `on page ${page}`;
-  }
+  const res = await fetchAllPages("reviewsList", count, getPage);
+  const { out, rows: all } = res;
+  const where = `across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
   // The API can't filter by type, so filter the fetched reviews here.
   const type = f.elements.review_type.value;
   const rows = type ? all.filter((r) => reviewType(r) === type) : all;
