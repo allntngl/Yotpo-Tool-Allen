@@ -370,15 +370,13 @@
             <h2>Retrieve orders</h2>
             <div class="endpoint"><span class="m get">GET</span><code>/core/v3/stores/{store_id}/orders</code></div>
           </div>
-          <p class="hint">Dates are in your local time zone.</p>
+          <p class="hint">Fetches every page of orders (100 per request). Dates are in your local time zone.</p>
           <form id="ordersList" class="grid">
-            <label class="field">Limit (1–100)<input name="limit" type="number" min="1" max="100" value="50"></label>
             <label class="field">Order date from <span class="opt">optional</span><input name="order_date_min" type="datetime-local"></label>
             <label class="field">Order date to <span class="opt">optional</span><input name="order_date_max" type="datetime-local"></label>
-            <label class="field">Page info <span class="opt">optional</span><input name="page_info" spellcheck="false"></label>
             <div class="actions">
               <button type="submit">Retrieve</button>
-              <button type="button" class="ghost" data-next="ordersList" disabled>Next page →</button>
+              <button type="button" class="ghost danger" data-stop="ordersList" disabled>Stop</button>
             </div>
           </form>
         </div>

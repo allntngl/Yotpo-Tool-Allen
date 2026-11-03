@@ -590,21 +590,6 @@ $("#clearToken").addEventListener("click", () => {
   toast("Token cleared");
 });
 
-// ---------- pagination ("Next page" buttons) ----------
-
-const nextPage = {};
-function setNext(formId, value) {
-  nextPage[formId] = value || "";
-  const btn = $(`[data-next="${formId}"]`);
-  if (btn) btn.disabled = !value;
-}
-$$("[data-next]").forEach((btn) => btn.addEventListener("click", () => {
-  const form = $(`#${btn.dataset.next}`);
-  if (form.elements.page_info) form.elements.page_info.value = nextPage[btn.dataset.next];
-  if (form.elements.page) form.elements.page.value = nextPage[btn.dataset.next];
-  form.requestSubmit();
-}));
-
 function onSubmit(id, handler) {
   $(id).addEventListener("submit", (e) => {
     e.preventDefault();
@@ -986,18 +971,20 @@ onSubmit("#productsUpdate", () => submitUpdate(puForm, puUpdate, "product"));
 
 onSubmit("#ordersList", async (f) => {
   const sid = requireStoreId();
-  const url = `${CORE}/${sid}/orders${qs({
-    limit: f.elements.limit.value,
-    order_date_min: toIso(f.elements.order_date_min.value),
-    order_date_max: toIso(f.elements.order_date_max.value),
-    page_info: f.elements.page_info.value.trim(),
-  })}`;
-  const out = await api("GET", url);
-  const rows = out.data?.orders || [];
-  const next = out.data?.pagination?.next_page_info;
-  setNext("ordersList", out.ok ? next : "");
-  f.elements.page_info.value = "";
-  showResult(out, rows, COLS.orders, out.ok ? `${rows.length} orders${next ? ". More available, use Next page." : ". Last page."}` : "");
+  // Cursor-paged: follow next_page_info until it runs out (100 per request, the API maximum).
+  const getPage = async (page, prev) => {
+    const out = await api("GET", `${CORE}/${sid}/orders${qs({
+      limit: 100,
+      order_date_min: toIso(f.elements.order_date_min.value),
+      order_date_max: toIso(f.elements.order_date_max.value),
+      page_info: prev?.next || "",
+    })}`);
+    const next = out.data?.pagination?.next_page_info || "";
+    return { out, rows: out.data?.orders || [], next, more: !!next };
+  };
+  const res = await fetchAllPages("ordersList", 100, getPage, "orders");
+  showResult(res.out, res.rows, COLS.orders,
+    res.out.ok ? `${res.rows.length} orders across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}` : "");
 });
 
 onSubmit("#ordersById", async (f) => {
