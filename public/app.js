@@ -233,17 +233,28 @@ const COLS = {
     C("Product Group", "group_name"),
     C("", (r) => ({ action: "editProduct", id: r.yotpo_id, label: "Edit" }), { action: true }),
   ],
+  // One row per order line item (see orderLines); report-style columns.
+  // Review, content nominee and review request data isn't returned by the
+  // orders API, so those columns are blank unless a row carries it.
   orders: [
-    C("Yotpo ID", "yotpo_id", { num: true }),
-    C("External ID", "external_id"),
-    C("Order name", "order_name"),
-    C("Order date", (r) => fmtDate(r.order_date)),
-    C("Customer", (r) => [r.customer?.first_name, r.customer?.last_name].filter(Boolean).join(" ")),
-    C("Email", (r) => r.customer?.email),
-    C("Total", (r) => (r.total_price != null ? `${r.total_price} ${r.currency || ""}` : ""), { num: true }),
-    C("Product IDs", (r) => (r.line_items || []).map((li) => `${li.external_product_id}×${li.quantity}`).join(", "), { clip: true }),
-    C("Fulfillment", (r) => (r.fulfillments || []).map((f) => f.status).join(", ")),
-    C("Cancelled", (r) => (r.cancellation ? fmtDate(r.cancellation.cancellation_date) : "")),
+    C("Orders App Key", () => storeIdEl.value.trim()),
+    C("Orders Order ID", "external_id"),
+    C("Orders Internal Order ID", "yotpo_id", { num: true }),
+    C("Orders Internal Order Line ID", (r) => r._line?.yotpo_id ?? r._line?.id, { num: true }),
+    C("Orders Created At", (r) => csvDate(r.created_at)),
+    C("Orders Order Date", (r) => csvDate(r.order_date)),
+    C("Orders Customer Email", (r) => r.customer?.email, { clip: true }),
+    C("Orders Customer Name", (r) => [r.customer?.first_name, r.customer?.last_name].filter(Boolean).join(" ")),
+    C("Review Created At", (r) => csvDate(r._review?.created_at)),
+    C("Review ID", (r) => r._review?.id, { num: true }),
+    C("Review Score", (r) => r._review?.score, { num: true }),
+    C("Review Sentiment", (r) => r._review?.sentiment),
+    C("Content Nominees Created At", (r) => csvDate(r._nominee?.created_at)),
+    C("Content Nominees Order Date", (r) => csvDate(r._nominee?.order_date)),
+    C("Product ID", (r) => r._line?.external_product_id),
+    C("Product Name", (r) => r._product?.name, { clip: true }),
+    C("Product URL", (r) => r._product?.url, { clip: true }),
+    C("Review Requests Review Requests", (r) => r._reviewRequests),
     C("", (r) => ({ action: "editOrder", id: r.yotpo_id, label: "Edit" }), { action: true }),
   ],
 };
@@ -432,7 +443,8 @@ $("#downloadCsv").addEventListener("click", () => {
   current.rows.forEach((r) => lines.push(cols.map((c) => cell(c.get(r))).join(",")));
   // Report-style name, e.g. "yotpo_reviews <store id> 2026-10-30T1545.csv".
   const d = new Date(), pad = (n) => String(n).padStart(2, "0");
-  const report = reviewCols ? "yotpo_reviews" : current.cols === COLS.products ? "yotpo_products" : "";
+  const report = reviewCols ? "yotpo_reviews" : current.cols === COLS.products ? "yotpo_products"
+    : current.cols === COLS.orders ? "yotpo_orders" : "";
   const name = report
     ? `${report} ${storeIdEl.value.trim()} ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}.csv`
     : `yotpo-${stamp()}.csv`;
@@ -976,6 +988,29 @@ onSubmit("#productsUpdate", () => submitUpdate(puForm, puUpdate, "product"));
 
 // ---------- Orders ----------
 
+// Orders show one row per line item. Line items only carry the external
+// product ID, so look up each product's name and URL (50 IDs per request).
+async function orderLines(sid, orders) {
+  const ids = [...new Set(orders.flatMap((o) => (o.line_items || []).map((li) => li.external_product_id)).filter(Boolean).map(String))];
+  const products = new Map();
+  for (let k = 0; k < ids.length; k += 50) {
+    const out = await api("GET", `${CORE}/${sid}/products${qs({ external_ids: ids.slice(k, k + 50).join(","), limit: 100 })}`);
+    (out.data?.products || []).forEach((pr) => products.set(String(pr.external_id), pr));
+    if (ids.length > 50) toast(`Looked up ${Math.min(k + 50, ids.length)} of ${ids.length} products…`, 1500);
+  }
+  return orders.flatMap((o) => (o.line_items?.length ? o.line_items : [null]).map((li) => ({
+    ...o,
+    _line: li,
+    _product: li ? products.get(String(li.external_product_id)) : undefined,
+  })));
+}
+async function showOrders(out, orders, summary = "") {
+  const sid = requireStoreId();
+  const rows = out.ok && orders.length ? await orderLines(sid, orders) : orders;
+  const lines = out.ok && rows.length !== orders.length ? `${summary ? " · " : ""}${rows.length} line items, one row each` : "";
+  showResult(out, rows, COLS.orders, summary + lines);
+}
+
 onSubmit("#ordersList", async (f) => {
   const sid = requireStoreId();
   // Cursor-paged: follow next_page_info until it runs out (100 per request, the API maximum).
@@ -990,7 +1025,7 @@ onSubmit("#ordersList", async (f) => {
     return { out, rows: out.data?.orders || [], next, more: !!next };
   };
   const res = await fetchAllPages("ordersList", 100, getPage, "orders");
-  showResult(res.out, res.rows, COLS.orders,
+  await showOrders(res.out, res.rows,
     res.out.ok ? `${res.rows.length} orders across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}` : "");
 });
 
@@ -999,11 +1034,11 @@ onSubmit("#ordersById", async (f) => {
   const ids = idList(f.elements.ids.value);
   if (f.elements.idType.value === "yotpo") {
     const out = await api("GET", `${CORE}/${sid}/orders/${encodeURIComponent(ids[0])}`);
-    showResult(out, out.data?.order ? [out.data.order] : [], COLS.orders);
+    await showOrders(out, out.data?.order ? [out.data.order] : []);
   } else {
     const out = await api("GET", `${CORE}/${sid}/orders${qs({ external_ids: ids.join(",") })}`);
     const rows = out.data?.orders || [];
-    showResult(out, rows, COLS.orders, out.ok ? `${rows.length} of ${ids.length} order(s) found` : "");
+    await showOrders(out, rows, out.ok ? `${rows.length} of ${ids.length} order(s) found` : "");
   }
 });
 
@@ -1038,7 +1073,7 @@ onSubmit("#ordersByProduct", async (f, btn) => {
   }
   if (!last?.ok) return showResult(last);
   const more = pageInfo ? " More orders remain unscanned; raise the page limit or narrow the dates." : "";
-  showResult({ ...last, data: { orders: matches } }, matches, COLS.orders,
+  await showOrders({ ...last, data: { orders: matches } }, matches,
     `${matches.length} order(s) contain product "${pid}". Scanned ${scanned} orders across ${pages} page(s).${stopScan ? " Stopped early." : ""}${more}`);
 });
 
@@ -1376,7 +1411,8 @@ $$("[data-lookup]").forEach((btn) => btn.addEventListener("click", () => withBus
   const sid = requireStoreId();
   const out = await api("GET", `${CORE}/${sid}/${kind}${qs({ external_ids: ext })}`);
   const rec = out.data?.[kind]?.[0];
-  showResult(out, out.data?.[kind] || [], COLS[kind]);
+  if (kind === "orders") await showOrders(out, out.data?.orders || []);
+  else showResult(out, out.data?.[kind] || [], COLS[kind]);
   if (rec) {
     form.elements.id.value = rec.yotpo_id;
     toast(`Found Yotpo ID ${rec.yotpo_id}. Loading…`);
