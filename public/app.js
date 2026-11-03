@@ -829,13 +829,15 @@ async function submitUpdate(form, ctl, kind) {
 
 onSubmit("#productsList", async (f) => {
   const sid = requireStoreId();
-  const url = `${CORE}/${sid}/products${qs({ limit: f.elements.limit.value, page_info: f.elements.page_info.value.trim() })}`;
-  const out = await api("GET", url);
-  const rows = out.data?.products || [];
-  const next = out.data?.pagination?.next_page_info;
-  setNext("productsList", out.ok ? next : "");
-  f.elements.page_info.value = "";
-  showResult(out, rows, COLS.products, out.ok ? `${rows.length} products${next ? ". More available, use Next page." : ". Last page."}` : "");
+  // Cursor-paged: follow next_page_info until it runs out (100 per request, the API maximum).
+  const getPage = async (page, prev) => {
+    const out = await api("GET", `${CORE}/${sid}/products${qs({ limit: 100, page_info: prev?.next || "" })}`);
+    const next = out.data?.pagination?.next_page_info || "";
+    return { out, rows: out.data?.products || [], next, more: !!next };
+  };
+  const res = await fetchAllPages("productsList", 100, getPage, "products");
+  showResult(res.out, res.rows, COLS.products,
+    res.out.ok ? `${res.rows.length} products across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}` : "");
 });
 
 onSubmit("#productsById", async (f) => {
@@ -1408,7 +1410,9 @@ $("#resTable").addEventListener("click", (e) => {
 const stopPaging = {};
 $$("[data-stop]").forEach((b) => b.addEventListener("click", () => { stopPaging[b.dataset.stop] = true; }));
 
-async function fetchAllPages(formId, perPage, fetchPage) {
+// fetchPage(page, previous) returns { out, rows, more? }; `more` overrides the
+// short-page check for cursor-paged endpoints.
+async function fetchAllPages(formId, perPage, fetchPage, noun = "reviews") {
   const stopBtn = $(`[data-stop="${formId}"]`);
   stopPaging[formId] = false;
   stopBtn.disabled = false;
@@ -1416,11 +1420,11 @@ async function fetchAllPages(formId, perPage, fetchPage) {
   let page = 0, last;
   try {
     do {
-      last = await fetchPage(++page);
+      last = await fetchPage(++page, last);
       if (!last.out.ok) break;
       rows.push(...last.rows);
-      toast(`Fetched ${rows.length} reviews…`, 1500);
-    } while (last.rows.length >= perPage && !stopPaging[formId]);
+      toast(`Fetched ${rows.length} ${noun}…`, 1500);
+    } while ((last.more ?? last.rows.length >= perPage) && !stopPaging[formId]);
   } finally {
     stopBtn.disabled = true;
   }

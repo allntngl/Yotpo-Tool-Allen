@@ -137,12 +137,11 @@
             <h2>Retrieve products</h2>
             <div class="endpoint"><span class="m get">GET</span><code>/core/v3/stores/{store_id}/products</code></div>
           </div>
+          <p class="hint">Fetches every page of products (100 per request).</p>
           <form id="productsList" class="grid">
-            <label class="field">Limit (1–100)<input name="limit" type="number" min="1" max="100" value="50"></label>
-            <label class="field">Page info <span class="opt">optional</span><input name="page_info" spellcheck="false"></label>
             <div class="actions">
               <button type="submit">Retrieve</button>
-              <button type="button" class="ghost" data-next="productsList" disabled>Next page →</button>
+              <button type="button" class="ghost danger" data-stop="productsList" disabled>Stop</button>
             </div>
           </form>
         </div>
