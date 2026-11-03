@@ -753,11 +753,9 @@
             <h2>Retrieve reviews by Product ID</h2>
             <div class="endpoint"><span class="m get">GET</span><code>api-cdn · /v1/widget/{store_id}/products/{product_id}/reviews.json</code></div>
           </div>
-          <p class="hint">Uses the <strong>external</strong> product ID. Data can lag by about 3 hours.</p>
+          <p class="hint">Uses the <strong>external</strong> product ID. Fetches every page of reviews (150 per request). Data can lag by about 3 hours.</p>
           <form id="reviewsByProduct" class="grid">
             <label class="field">External product ID<input name="productId" required spellcheck="false"></label>
-            <label class="field">Per page (max 150)<input name="per_page" type="number" min="1" max="150" value="50"></label>
-            <label class="field">Page<input name="page" type="number" min="1" value="1"></label>
             <label class="field">Star filter
               <select name="star"><option value="">All</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
             </label>
@@ -767,7 +765,6 @@
             <label class="field">Direction
               <select name="direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select>
             </label>
-            <label class="check"><input name="all_pages" type="checkbox"> Fetch all pages <span class="opt">ignores Per page and Page</span></label>
             <div class="actions">
               <button type="submit">Retrieve</button>
               <button type="button" class="ghost danger" data-stop="reviewsByProduct" disabled>Stop</button>

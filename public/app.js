@@ -1472,8 +1472,7 @@ onSubmit("#reviewsByProduct", async (f) => {
   const sid = requireStoreId();
   const productId = f.elements.productId.value.trim();
   const pid = encodeURIComponent(productId);
-  const allPages = f.elements.all_pages.checked;
-  const perPage = allPages ? 150 : Number(f.elements.per_page.value) || 50;
+  const perPage = 150; // API maximum per request; every page is fetched
   const getPage = async (page) => {
     const out = await api("GET", `${CDN}/v1/widget/${sid}/products/${pid}/reviews.json${qs({
       per_page: perPage,
@@ -1485,16 +1484,9 @@ onSubmit("#reviewsByProduct", async (f) => {
     // Widget reviews don't carry the external product ID; add it for the table and CSV.
     return { out, rows: (out.data?.response?.reviews || []).map((rv) => ({ ...rv, sku: productId })) };
   };
-  let out, rows, where;
-  if (allPages) {
-    const res = await fetchAllPages("reviewsByProduct", perPage, getPage);
-    ({ out, rows } = res);
-    where = `fetched ${rows.length} across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
-  } else {
-    ({ out, rows } = await getPage(Number(f.elements.page.value) || 1));
-    const p = out.data?.response?.pagination;
-    where = `page ${p?.page} of ${Math.max(1, Math.ceil((p?.total || 0) / (p?.per_page || 1)))}`;
-  }
+  const res = await fetchAllPages("reviewsByProduct", perPage, getPage);
+  const { out, rows } = res;
+  const where = `fetched ${rows.length} across ${res.pages} page(s)${res.stopped ? ", stopped early" : ""}`;
   const bl = out.data?.response?.bottomline;
   const summary = bl ? `${bl.total_review} total reviews · average ${Number(bl.average_score).toFixed(2)} · ${where}` : "";
   showResult(out, rows, COLS.widgetReviews, out.ok ? summary : "");
