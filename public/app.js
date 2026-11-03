@@ -246,30 +246,6 @@ const COLS = {
     C("Cancelled", (r) => (r.cancellation ? fmtDate(r.cancellation.cancellation_date) : "")),
     C("", (r) => ({ action: "editOrder", id: r.yotpo_id, label: "Edit" }), { action: true }),
   ],
-  reviews: [
-    C("Review ID", "id", { num: true }),
-    C("Type", (r) => reviewType(r)),
-    C("Score", "score", { num: true }),
-    C("Title", (r) => decodeEntities(r.title), { clip: true }),
-    C("Content", (r) => decodeEntities(r.content), { clip: true }),
-    C("Name", "name"),
-    C("Email", "email"),
-    C("SKU / Product", "sku"),
-    C("Created", (r) => fmtDate(r.created_at)),
-    C("Deleted", (r) => (r.deleted ? "yes" : "")),
-    C("Incentivized", (r) => (r.is_incentivized ? r.incentive_type || "yes" : "")),
-  ],
-  widgetReviews: [
-    C("Review ID", "id", { num: true }),
-    C("Type", (r) => reviewType(r)),
-    C("Score", "score", { num: true }),
-    C("Title", (r) => decodeEntities(r.title), { clip: true }),
-    C("Content", (r) => decodeEntities(r.content), { clip: true }),
-    C("Reviewer", (r) => r.user?.display_name),
-    C("Verified buyer", (r) => (r.verified_buyer ? "yes" : "")),
-    C("Votes", (r) => `+${r.votes_up || 0} / -${r.votes_down || 0}`),
-    C("Created", (r) => fmtDate(r.created_at)),
-  ],
 };
 
 // Turn any object into key/value rows for single-record responses.
@@ -284,9 +260,8 @@ function kvRows(obj, prefix = "") {
 }
 const KV_COLS = [C("Field", "field"), C("Value", "value", { clip: false })];
 
-// Review CSV exports use report-style headers (like the internal_tools_reports
-// exports) instead of the on-screen table columns. Both review APIs share one
-// column list; each getter tries the field names either API uses, and a column
+// Review results use report-style columns (like the internal_tools_reports
+// exports), on screen and in the CSV. Both review APIs share one column list; each getter tries the field names either API uses, and a column
 // is left blank when the API doesn't return that data.
 const csvDate = (v) => (v ? new Date(v).toISOString().slice(0, 19).replace("T", " ") : "");
 const yesNo = (v) => (v ? "Yes" : "No");
@@ -327,36 +302,34 @@ function customQuestions(r) {
 
 const REVIEW_CSV = [
   C("Review App Key", (r) => r.appkey || r.app_key || storeIdEl.value.trim()),
-  C("Review ID", "id"),
+  C("Review ID", "id", { num: true }),
   C("Review Created Date", (r) => csvDate(r.created_at)),
   C("Review Is Published (Yes / No)", (r) => yesNo(r.published ?? !(r.deleted || r.archived))),
-  C("Review Content", (r) => decodeEntities(r.content)),
-  C("Review Title", (r) => decodeEntities(r.title)),
-  C("Review Score", "score"),
+  C("Review Content", (r) => decodeEntities(r.content), { clip: true }),
+  C("Review Title", (r) => decodeEntities(r.title), { clip: true }),
+  C("Review Score", "score", { num: true }),
   C("Review Reviewer Name", (r) => r.name || r.user?.display_name),
-  C("Review Reviewer Email", (r) => r.email || r.user?.email),
+  C("Review Reviewer Email", (r) => r.email || r.user?.email, { clip: true }),
   C("Review Is Verified Buyer (Yes / No)", (r) => yesNoOrBlank(r.verified_buyer ?? r.is_verified_buyer)),
   C("Review Country Code", (r) => r.country_code || r.customer_metadata?.country || r.user?.country || r.user?.country_code),
   C("Product ID", (r) => r.sku || reviewProduct(r).domain_key),
-  C("Product Name", (r) => reviewProduct(r).name),
+  C("Product Name", (r) => reviewProduct(r).name, { clip: true }),
   C("Product Group", (r) => reviewProduct(r).group_name || reviewProduct(r).group),
   C("Product Tags", (r) => tagNames(reviewProduct(r).product_tags || reviewProduct(r).tags)),
-  C("Product URL", (r) => reviewProduct(r).product_url || reviewProduct(r).product_link || reviewProduct(r).url),
-  C("Product Image URL", (r) => productImage(reviewProduct(r))),
-  C("Images Published Image URL", (r) => mediaUrls(reviewImages(r), true, IMAGE_KEYS)),
-  C("Images Unpublished Image URL", (r) => mediaUrls(reviewImages(r), false, IMAGE_KEYS)),
+  C("Product URL", (r) => reviewProduct(r).product_url || reviewProduct(r).product_link || reviewProduct(r).url, { clip: true }),
+  C("Product Image URL", (r) => productImage(reviewProduct(r)), { clip: true }),
+  C("Images Published Image URL", (r) => mediaUrls(reviewImages(r), true, IMAGE_KEYS), { clip: true }),
+  C("Images Unpublished Image URL", (r) => mediaUrls(reviewImages(r), false, IMAGE_KEYS), { clip: true }),
   C("Comment Is Public (Yes / No)", (r) => { const c = reviewComment(r); return c ? yesNo(c.public ?? c.is_public) : ""; }),
-  C("Comment Content", (r) => decodeEntities(reviewComment(r)?.content)),
+  C("Comment Content", (r) => decodeEntities(reviewComment(r)?.content), { clip: true }),
   C("Comment Created At", (r) => { const c = reviewComment(r); return c ? csvDate(c.created_at || c.comment_date) : ""; }),
   C("Review Tags", (r) => tagNames(r.tags || r.review_tags)),
-  C("Videos Published URL", (r) => mediaUrls(reviewVideos(r), true, VIDEO_KEYS)),
-  C("Videos Unpublished URL", (r) => mediaUrls(reviewVideos(r), false, VIDEO_KEYS)),
-  C("Review Custom Questions", (r) => customQuestions(r)),
+  C("Videos Published URL", (r) => mediaUrls(reviewVideos(r), true, VIDEO_KEYS), { clip: true }),
+  C("Videos Unpublished URL", (r) => mediaUrls(reviewVideos(r), false, VIDEO_KEYS), { clip: true }),
+  C("Review Custom Questions", (r) => customQuestions(r), { clip: true }),
 ];
-const CSV_COLS = new Map([
-  [COLS.reviews, REVIEW_CSV],
-  [COLS.widgetReviews, REVIEW_CSV],
-]);
+COLS.reviews = REVIEW_CSV;
+COLS.widgetReviews = REVIEW_CSV;
 
 function showResult(out, rows = null, cols = null, summary = "", fromHistory = false) {
   if (!fromHistory) addHistory(out, rows, cols, summary);
@@ -447,8 +420,8 @@ function download(name, text, type) {
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 $("#downloadJson").addEventListener("click", () => download(`yotpo-${stamp()}.json`, $("#resJson").textContent, "application/json"));
 $("#downloadCsv").addEventListener("click", () => {
-  const reviewCols = CSV_COLS.get(current.cols);
-  const cols = reviewCols || current.cols.filter((c) => !c.action);
+  const reviewCols = current.cols === REVIEW_CSV;
+  const cols = current.cols.filter((c) => !c.action);
   if (!current.rows.length || !cols.length) return toast("Nothing to export as CSV");
   // Quote only cells that need it, as the report exports do.
   const cell = (v) => {
